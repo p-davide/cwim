@@ -5,12 +5,13 @@ enum TokenType {
     Binary,
     Space,
     Comment,
-    LBrace,
-    RBrace,
+    LParen,
+    RParen,
     LBracket,
     RBracket,
     Newline,
     Comma,
+    Semicolon,
 }
 #[derive(PartialEq, Eq, Debug, Copy, Clone)]
 struct Token<'t> {
@@ -34,22 +35,107 @@ fn parse(text: &str) -> Result<Vec<Token>, ParseError> {
         match parse_token(state.to_parse) {
             Ok(token) => {
                 state.tokens.push(token);
-                state.to_parse = &state.to_parse[token.lexeme.len()..]
+                state.to_parse = &state.to_parse[token.lexeme.len()..];
             }
-            Err(err) => return Err(err)
+            Err(err) => return Err(err),
         }
     }
     Ok(state.tokens)
 }
 
 fn parse_token(text: &str) -> Result<Token, ParseError> {
-    for c in text.chars() {
+    if let Some(c) = text.chars().nth(0) {
+        if c.is_ascii_digit() {
+            return parse_number(text);
+        }
+        if SYMBOLS.contains(c) {
+            return parse_binary(text);
+        }
+        if c.is_ascii_alphabetic() {
+            return parse_identifier(text);
+        }
         match c {
-            '0'..='9' => return parse_number(text),
-            _ => { break; }
+            ' ' => return parse_space(text),
+            '\n' => return parse_newline(text),
+            '[' => return parse_lbracket(text),
+            ']' => return parse_rbracket(text),
+            '(' => return parse_lparen(text),
+            ')' => return parse_rparen(text),
+            ',' => return parse_comma(text),
+            ';' => return parse_semicolon(text),
+            '#' => return parse_comment(text),
+            _ => {}
         }
     }
     Err(())
+}
+const SYMBOLS: &str = "!@$%^&*|\"';,./+-";
+fn parse_char(c: char, ttype: TokenType, text: &str) -> Result<Token, ParseError> {
+    if text.chars().nth(0) == Some(c) {
+        let token = Token {
+            ttype: ttype,
+            lexeme: &text[..1],
+        };
+        Ok(token)
+    } else {
+        Err(())
+    }
+}
+
+fn parse_space(text: &str) -> Result<Token, ParseError> {
+    parse_char(' ', TokenType::Space, text)
+}
+
+fn parse_comma(text: &str) -> Result<Token, ParseError> {
+    parse_char(',', TokenType::Comma, text)
+}
+
+fn parse_semicolon(text: &str) -> Result<Token, ParseError> {
+    parse_char(';', TokenType::Semicolon, text)
+}
+
+fn parse_newline(text: &str) -> Result<Token, ParseError> {
+    parse_char('\n', TokenType::Newline, text)
+}
+
+fn parse_lbracket(text: &str) -> Result<Token, ParseError> {
+    parse_char('[', TokenType::LBracket, text)
+}
+
+fn parse_rbracket(text: &str) -> Result<Token, ParseError> {
+    parse_char(']', TokenType::RBracket, text)
+}
+
+fn parse_lparen(text: &str) -> Result<Token, ParseError> {
+    parse_char('(', TokenType::LParen, text)
+}
+
+fn parse_rparen(text: &str) -> Result<Token, ParseError> {
+    parse_char(')', TokenType::RParen, text)
+}
+
+fn parse_comment(text: &str) -> Result<Token, ParseError> {
+    let mut l: usize = 0;
+    for c in text.chars() {
+        if c == '\n' {
+            let token = Token {
+                ttype: TokenType::Comment,
+                lexeme: &text[..l],
+            };
+            return Ok(token);
+        } else {
+            l = l + 1;
+        }
+    }
+    if l == 0 {
+        Err(())
+    } else {
+        let token = Token {
+            ttype: TokenType::Comment,
+            lexeme: &text[..l],
+        };
+        Ok(token)
+    }
 }
 
 fn parse_number(text: &str) -> Result<Token, ParseError> {
@@ -57,18 +143,56 @@ fn parse_number(text: &str) -> Result<Token, ParseError> {
     for c in text.chars() {
         if c.is_ascii_digit() {
             l += 1;
-        } else { break; }
+        } else {
+            break;
+        }
     }
     if l == 0 {
         Err(())
     } else {
         let token = Token {
             ttype: TokenType::Literal,
-            lexeme: &text[..l]
+            lexeme: &text[..l],
         };
         Ok(token)
     }
 }
+
+fn parse_identifier(text: &str) -> Result<Token, ParseError> {
+    let mut l: usize = 0;
+    for c in text.chars() {
+        if c.is_ascii_alphabetic() {
+            l += 1;
+        } else {
+            break;
+        }
+    }
+    if l == 0 {
+        Err(())
+    } else {
+        let token = Token {
+            ttype: TokenType::Identifier,
+            lexeme: &text[..l],
+        };
+        Ok(token)
+    }
+}
+
+fn parse_binary<'a>(text: &'a str) -> Result<Token<'a>, ParseError> {
+    if SYMBOLS.contains(text.chars().nth(0).expect("there should be a char here")) {
+        let token = Token {
+            ttype: TokenType::Binary,
+            lexeme: &text[..1],
+        };
+        Ok(token)
+    } else {
+        Err(())
+    }
+}
 fn main() {
-    println!("{:?}", parse("234"));
+    println!("{:?}", parse("(234 + 400) * 8"));
+    println!(
+        "{:?}",
+        parse("[234x + 400 1222] * [8; 10] # this is a comment")
+    );
 }
