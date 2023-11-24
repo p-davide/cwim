@@ -3,6 +3,7 @@ pub enum TokenType {
     Literal,
     Identifier,
     Binary,
+    SpacedBinary,
     Space,
     Comment,
     LParen,
@@ -12,7 +13,13 @@ pub enum TokenType {
     Newline,
     Comma,
     Semicolon,
+    Error,
 }
+
+pub const ERROR: Token = Token {
+    ttype: TokenType::Error,
+    lexeme: ""
+};
 
 #[derive(PartialEq, Eq, Debug, Copy, Clone)]
 pub struct Token<'t> {

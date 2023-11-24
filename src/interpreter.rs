@@ -1,14 +1,16 @@
 use crate::token::*;
+use std::fmt::Debug;
+use std::fmt::Formatter;
 
-#[derive(PartialEq)]
+#[derive(PartialEq, Clone)]
 pub enum Expr {
     Literal(f64),
     Binary(Binary),
     Variable(String),
 }
 
-impl std::fmt::Debug for Expr {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> Result<(), std::fmt::Error> {
+impl Debug for Expr {
+    fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), std::fmt::Error> {
         match self {
             Expr::Literal(n) => write!(f, "L{:?}", n),
             Expr::Binary(n) => write!(f, "B{:?}", n),
@@ -24,49 +26,57 @@ pub struct Binary {
     pub precedence: usize,
 }
 
-impl std::fmt::Debug for Binary {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> Result<(), std::fmt::Error> {
+impl Debug for Binary {
+    fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), std::fmt::Error> {
         write!(f, "[{}:{}]", self.name, self.precedence)
+    }
+}
+
+impl Binary {
+    fn minus_pred(&mut self, prec: usize) -> Self {
+        Self {
+            name: self.name,
+            f: self.f,
+            precedence: self.precedence - prec,
+        }
     }
 }
 
 pub const ADD: Binary = Binary {
     name: "+",
-    f: |x, y| x + y,
-    precedence: 4,
+    f: |y, x| x + y,
+    precedence: 14,
 };
 
 pub const SUB: Binary = Binary {
     name: "-",
-    f: |x, y| x - y,
-    precedence: 4,
+    f: |y, x| x - y,
+    precedence: 14,
 };
 
 pub const MUL: Binary = Binary {
     name: "*",
-    f: |x, y| x * y,
-    precedence: 5,
+    f: |y, x| x * y,
+    precedence: 15,
 };
 
 pub const DIV: Binary = Binary {
     name: "/",
-    f: |x, y| x / y,
-    precedence: 5,
+    f: |y, x| x / y,
+    precedence: 15,
 };
 
 pub const POW: Binary = Binary {
     name: "^",
-    f: |x, y| x.powf(y),
-    precedence: 6,
+    f: |y, x| x.powf(y),
+    precedence: 16,
 };
 
 pub fn understand(tokens: Vec<Token>) -> Option<Vec<Expr>> {
     let mut result: Vec<Expr> = vec![];
     for tok in tokens {
-        match understand_one(tok) {
-            Some(x) => result.push(x),
-            None => return None,
-        }
+        let expr = understand_one(tok)?;
+        result.push(expr);
     }
     Some(result)
 }
@@ -86,6 +96,15 @@ fn understand_one(tok: Token) -> Option<Expr> {
             "^" => Some(Expr::Binary(POW)),
             _ => None,
         },
+        TokenType::SpacedBinary => match tok.lexeme {
+            " + " => Some(Expr::Binary(ADD.minus_pred(10))),
+            " - " => Some(Expr::Binary(SUB.minus_pred(10))),
+            " * " => Some(Expr::Binary(MUL.minus_pred(10))),
+            " / " => Some(Expr::Binary(DIV.minus_pred(10))),
+            " ^ " => Some(Expr::Binary(POW.minus_pred(10))),
+            _ => None,
+        },
+        TokenType::Error => None,
         _ => unimplemented!(),
     }
 }
@@ -111,8 +130,7 @@ pub fn shuntingyard(exprs: Vec<Expr>) -> Option<Vec<Expr>> {
             }
         }
     }
-    ops.reverse();
-    for op in ops {
+    while let Some(op) = ops.pop() {
         result.push(Expr::Binary(op))
     }
     Some(result)
