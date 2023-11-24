@@ -3,5 +3,5 @@
 version = 3
 
 [[package]]
-name = "cwin"
+name = "cwim"
 version = "0.1.0"

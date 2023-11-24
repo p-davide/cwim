@@ -1,15 +1,11 @@
-use cwin::parser::*;
-use cwin::interpreter::*;
+use cwim::parser::*;
+use cwim::interpreter::*;
 
 fn run(text: &str) -> Option<f64> {
     let tks = parse(text)?;
     let exprs = understand(tks)?;
     let s = shuntingyard(exprs)?;
-    if let Some(n) = eval(s) {
-        Some(n)
-    } else {
-        None
-    }
+    eval(s)
 }
 
 fn main() {
