@@ -223,31 +223,29 @@ impl std::fmt::Debug for Binary {
     }
 }
 
-const add: Binary = Binary {
+const ADD: Binary = Binary {
     name: "+",
     f: |x,y| x+y,
     precedence: 4,
 };
 
-const sub: Binary = Binary {
+const SUB: Binary = Binary {
     name: "-",
     f: |x,y| x-y,
     precedence: 4,
 };
 
-const mul: Binary = Binary {
+const MUL: Binary = Binary {
     name: "*",
     f: |x,y| x*y,
     precedence: 5,
 };
 
-const div: Binary = Binary {
+const DIV: Binary = Binary {
     name: "/",
     f: |x,y| x/y,
     precedence: 5,
 };
-
-type InterpretError = ();
 
 fn understand(tokens: Vec<Token>) -> Option<Vec<Expr>> {
     let mut result: Vec<Expr> = vec![];
@@ -268,10 +266,10 @@ fn understand_one(tok: Token) -> Option<Expr> {
         },
         TokenType::Identifier => Some(Expr::Variable(tok.lexeme.to_owned())),
         TokenType::Binary => match tok.lexeme {
-            "+" => Some(Expr::Binary(add)),
-            "-" => Some(Expr::Binary(sub)),
-            "*" => Some(Expr::Binary(mul)),
-            "/" => Some(Expr::Binary(div)),
+            "+" => Some(Expr::Binary(ADD)),
+            "-" => Some(Expr::Binary(SUB)),
+            "*" => Some(Expr::Binary(MUL)),
+            "/" => Some(Expr::Binary(DIV)),
             _ => None,
         },
         _ => unimplemented!(),
@@ -309,32 +307,32 @@ fn shuntingyard(exprs: Vec<Expr>) -> Option<Vec<Expr>> {
 fn _shuntingyard() {
     assert_eq!(shuntingyard(vec![
         Expr::Literal(234.0),
-        Expr::Binary(mul),
+        Expr::Binary(MUL),
         Expr::Literal(5.0),
     ]), Some(vec![
         Expr::Literal(234.0),
         Expr::Literal(5.0),
-        Expr::Binary(mul),
+        Expr::Binary(MUL),
     ]));
 }
 #[test]
 fn _shuntingyard_2() {
     assert_eq!(shuntingyard(vec![
         Expr::Literal(234.0),
-        Expr::Binary(mul),
+        Expr::Binary(MUL),
         Expr::Literal(5.0),
-        Expr::Binary(add),
+        Expr::Binary(ADD),
         Expr::Literal(7.0),
-        Expr::Binary(mul),
+        Expr::Binary(MUL),
         Expr::Literal(8.0),
     ]), Some(vec![
         Expr::Literal(234.0),
         Expr::Literal(5.0),
-        Expr::Binary(mul),
+        Expr::Binary(MUL),
         Expr::Literal(7.0),
         Expr::Literal(8.0),
-        Expr::Binary(mul),
-        Expr::Binary(add),
+        Expr::Binary(MUL),
+        Expr::Binary(ADD),
     ]));
 }
 
@@ -373,6 +371,6 @@ fn run(text: &str) -> Option<f64> {
 fn main() {
     //let expr1 = "(234 + 400) * 8";
     //let expr2 = "[234x + 400 1222] * [8; 10] # this is a comment";
-    let expr3 = "234*5+7*8";
+    let expr3 = "234*5+7*8/0";
     println!("{:?}", run(expr3));
 }
