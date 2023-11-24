@@ -213,7 +213,7 @@ impl std::fmt::Debug for Expr {
 #[derive(Copy, Clone, PartialEq, Eq)]
 struct Binary {
     name: &'static str,
-    f: fn(f64,f64) -> f64,
+    f: fn(f64, f64) -> f64,
     precedence: usize,
 }
 
@@ -225,26 +225,32 @@ impl std::fmt::Debug for Binary {
 
 const ADD: Binary = Binary {
     name: "+",
-    f: |x,y| x+y,
+    f: |x, y| x + y,
     precedence: 4,
 };
 
 const SUB: Binary = Binary {
     name: "-",
-    f: |x,y| x-y,
+    f: |x, y| x - y,
     precedence: 4,
 };
 
 const MUL: Binary = Binary {
     name: "*",
-    f: |x,y| x*y,
+    f: |x, y| x * y,
     precedence: 5,
 };
 
 const DIV: Binary = Binary {
     name: "/",
-    f: |x,y| x/y,
+    f: |x, y| x / y,
     precedence: 5,
+};
+
+const POW: Binary = Binary {
+    name: "^",
+    f: |x, y| x.powf(y),
+    precedence: 6,
 };
 
 fn understand(tokens: Vec<Token>) -> Option<Vec<Expr>> {
@@ -270,6 +276,7 @@ fn understand_one(tok: Token) -> Option<Expr> {
             "-" => Some(Expr::Binary(SUB)),
             "*" => Some(Expr::Binary(MUL)),
             "/" => Some(Expr::Binary(DIV)),
+            "^" => Some(Expr::Binary(POW)),
             _ => None,
         },
         _ => unimplemented!(),
@@ -286,10 +293,11 @@ fn shuntingyard(exprs: Vec<Expr>) -> Option<Vec<Expr>> {
             Expr::Literal(_) | Expr::Variable(_) => result.push(expr),
             Expr::Binary(b) => {
                 while let Some(op) = ops.last() {
-                    if b.precedence < op.precedence {
+                    // NOTE: This assumes every operator is left-associative.
+                    if b.precedence <= op.precedence {
                         result.push(Expr::Binary(ops.pop()?))
                     } else {
-                        break
+                        break;
                     }
                 }
                 ops.push(b)
@@ -305,35 +313,73 @@ fn shuntingyard(exprs: Vec<Expr>) -> Option<Vec<Expr>> {
 
 #[test]
 fn _shuntingyard() {
-    assert_eq!(shuntingyard(vec![
-        Expr::Literal(234.0),
-        Expr::Binary(MUL),
-        Expr::Literal(5.0),
-    ]), Some(vec![
-        Expr::Literal(234.0),
-        Expr::Literal(5.0),
-        Expr::Binary(MUL),
-    ]));
+    assert_eq!(
+        shuntingyard(vec![
+            Expr::Literal(234.0),
+            Expr::Binary(MUL),
+            Expr::Literal(5.0),
+        ]),
+        Some(vec![
+            Expr::Literal(234.0),
+            Expr::Literal(5.0),
+            Expr::Binary(MUL),
+        ])
+    );
 }
 #[test]
 fn _shuntingyard_2() {
-    assert_eq!(shuntingyard(vec![
-        Expr::Literal(234.0),
-        Expr::Binary(MUL),
-        Expr::Literal(5.0),
-        Expr::Binary(ADD),
-        Expr::Literal(7.0),
-        Expr::Binary(MUL),
-        Expr::Literal(8.0),
-    ]), Some(vec![
-        Expr::Literal(234.0),
-        Expr::Literal(5.0),
-        Expr::Binary(MUL),
-        Expr::Literal(7.0),
-        Expr::Literal(8.0),
-        Expr::Binary(MUL),
-        Expr::Binary(ADD),
-    ]));
+    assert_eq!(
+        shuntingyard(vec![
+            Expr::Literal(234.0),
+            Expr::Binary(MUL),
+            Expr::Literal(5.0),
+            Expr::Binary(ADD),
+            Expr::Literal(7.0),
+            Expr::Binary(MUL),
+            Expr::Literal(8.0),
+        ]),
+        Some(vec![
+            Expr::Literal(234.0),
+            Expr::Literal(5.0),
+            Expr::Binary(MUL),
+            Expr::Literal(7.0),
+            Expr::Literal(8.0),
+            Expr::Binary(MUL),
+            Expr::Binary(ADD),
+        ])
+    );
+}
+
+#[test]
+fn _shuntingyard_3() {
+    assert_eq!(
+        shuntingyard(vec![
+            Expr::Literal(2.0),
+            Expr::Binary(POW),
+            Expr::Literal(4.0),
+            Expr::Binary(MUL),
+            Expr::Literal(5.0),
+            Expr::Binary(ADD),
+            Expr::Literal(6.0),
+            Expr::Binary(ADD),
+            Expr::Literal(1.0),
+            Expr::Binary(POW),
+            Expr::Literal(9.0),
+        ]),
+        Some(vec![
+            Expr::Literal(2.0),
+            Expr::Literal(4.0),
+            Expr::Binary(POW),
+            Expr::Literal(5.0),
+            Expr::Binary(MUL),
+            Expr::Literal(6.0),
+            Expr::Binary(ADD),
+            Expr::Literal(1.0),
+            Expr::Literal(9.0),
+            Expr::Binary(POW),
+            Expr::Binary(ADD),
+        ])
+    );
 }
 
 // -- eval
@@ -347,8 +393,8 @@ fn eval(shunted: Vec<Expr>) -> Option<f64> {
                 let x = stack.pop()?;
                 let y = stack.pop()?;
                 let f = b.f;
-                stack.push(f(x,y));
-            },
+                stack.push(f(x, y));
+            }
             _ => unimplemented!(),
         }
     }
