@@ -1,4 +1,6 @@
+use crate::binary::*;
 use crate::token::*;
+use crate::unary::*;
 use std::fmt::Debug;
 use std::fmt::Formatter;
 
@@ -7,6 +9,7 @@ pub enum Expr {
     Literal(f64),
     Binary(Binary),
     Variable(String),
+    Unary(Unary),
 }
 
 impl Debug for Expr {
@@ -15,62 +18,10 @@ impl Debug for Expr {
             Expr::Literal(n) => write!(f, "L{:?}", n),
             Expr::Binary(n) => write!(f, "B{:?}", n),
             Expr::Variable(n) => write!(f, "V{:?}", n),
+            Expr::Unary(n) => write!(f, "U{:?}", n),
         }
     }
 }
-
-#[derive(Copy, Clone, PartialEq, Eq)]
-pub struct Binary {
-    pub name: &'static str,
-    pub f: fn(f64, f64) -> f64,
-    pub precedence: usize,
-}
-
-impl Debug for Binary {
-    fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), std::fmt::Error> {
-        write!(f, "[{}:{}]", self.name, self.precedence)
-    }
-}
-
-impl Binary {
-    fn minus_pred(&mut self, prec: usize) -> Self {
-        Self {
-            name: self.name,
-            f: self.f,
-            precedence: self.precedence - prec,
-        }
-    }
-}
-
-pub const ADD: Binary = Binary {
-    name: "+",
-    f: |y, x| x + y,
-    precedence: 14,
-};
-
-pub const SUB: Binary = Binary {
-    name: "-",
-    f: |y, x| x - y,
-    precedence: 14,
-};
-
-pub const MUL: Binary = Binary {
-    name: "*",
-    f: |y, x| x * y,
-    precedence: 15,
-};
-
-pub const DIV: Binary = Binary {
-    name: "/",
-    f: |y, x| x / y,
-    precedence: 15,
-};
-
-pub const POW: Binary = Binary {
-    name: "^",
-    f: |y, x| x.powf(y),
-    precedence: 16,
-};
 
 pub fn understand(tokens: Vec<Token>) -> Option<Vec<Expr>> {
     let mut result: Vec<Expr> = vec![];
