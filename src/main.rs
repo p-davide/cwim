@@ -1,5 +1,6 @@
 use cwim::interpreter::*;
 use cwim::parser::*;
+use inquire::Text;
 
 fn run(text: &str) -> Option<f64> {
     let tks = parse(text)?;
@@ -35,7 +36,16 @@ fn _run_with_spaces_2() {
 fn _run_with_spaces_3() {
     assert_eq!(run("234 *5+7*8-18 ^ 3"), None);
 }
+
 fn main() {
     //let expr1 = "(234 + 400) * 8";
     //let expr2 = "[234x + 400 1222] * [8; 10] # this is a comment";
+    loop {
+        let line = Text::new("").prompt().expect("invalid cwim");
+        if let Some(result) = run(&line) {
+            println!("{}", result)
+        } else {
+            eprintln!("invalid cwim")
+        }
+    }
 }

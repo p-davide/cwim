@@ -75,8 +75,11 @@ pub const POW: Binary = Binary {
 pub fn understand(tokens: Vec<Token>) -> Option<Vec<Expr>> {
     let mut result: Vec<Expr> = vec![];
     for tok in tokens {
-        let expr = understand_one(tok)?;
-        result.push(expr);
+        // TODO: multiline expressions
+        if tok.ttype != TokenType::Newline {
+            let expr = understand_one(tok)?;
+            result.push(expr);
+        }
     }
     Some(result)
 }
