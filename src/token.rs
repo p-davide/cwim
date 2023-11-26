@@ -3,7 +3,6 @@ pub enum TokenType {
     Literal,
     Identifier,
     Binary,
-    SpacedBinary,
     Space,
     Comment,
     LParen,

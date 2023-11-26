@@ -27,32 +27,67 @@ pub fn parse(text: &str) -> Parsed<Vec<Token>> {
     Some(state.tokens)
 }
 
-fn parse_spaced_binary(text: &str) -> Parsed<Token> {
-    /* front back
-        "   2   "
-    */
-    let front_space = parse_space(text);
-    let front_length = match front_space {
-        Some(t) => t.lexeme.len(),
-        None => 0,
+pub fn parenthesize(spaced: Vec<Token>) -> Option<Vec<Token>> {
+    let mut result = vec![];
+    let mut ignore_space = false;
+
+    let lparen = Token {
+        ttype: TokenType::LParen,
+        lexeme: "",
+    };
+    let rparen = Token {
+        ttype: TokenType::RParen,
+        lexeme: "",
     };
 
-    let token = parse_binary(&text[front_length..])?;
-
-    let back = &text[front_length + token.lexeme.len()..];
-    let back_space = parse_space(back);
-    let back_length = match back_space {
-        Some(t) => t.lexeme.len(),
-        None => 0,
-    };
-    Some(if back_length != front_length {
-        ERROR
-    } else {
-        Token {
-            ttype: TokenType::SpacedBinary,
-            lexeme: &text[..(front_length + token.lexeme.len() + back_length)],
+    result.push(lparen);
+    for tok in spaced {
+        match tok.ttype {
+            TokenType::Binary => {
+                if result.last()?.ttype == TokenType::Space {
+                    ignore_space = true;
+                    result.pop();
+                    result.push(rparen);
+                    result.push(tok);
+                    result.push(lparen);
+                } else {
+                    result.push(tok);
+                }
+            }
+            TokenType::Space => if !ignore_space {
+                result.push(tok);
+            } else {
+                ignore_space = false;
+            }
+            _ => {
+                ignore_space = false;
+                result.push(tok)
+            }
         }
-    })
+    }
+    result.push(rparen);
+    Some(result)
+}
+
+#[test]
+fn _parenthesize() {
+    let parsed = parse("234*5+7*8-18^3");
+    let actual = parsed.map(|ts|parenthesize(ts)).flatten();
+    assert_eq!(actual, Some(vec![
+        Token { ttype: TokenType::LParen , lexeme: "" },
+        Token { ttype: TokenType::Literal , lexeme: "234" },
+        Token { ttype: TokenType::Binary , lexeme: "*" },
+        Token { ttype: TokenType::Literal , lexeme: "5" },
+        Token { ttype: TokenType::Binary , lexeme: "+" },
+        Token { ttype: TokenType::Literal , lexeme: "7" },
+        Token { ttype: TokenType::Binary , lexeme: "*" },
+        Token { ttype: TokenType::Literal , lexeme: "8" },
+        Token { ttype: TokenType::Binary , lexeme: "-" },
+        Token { ttype: TokenType::Literal , lexeme: "18" },
+        Token { ttype: TokenType::Binary , lexeme: "^" },
+        Token { ttype: TokenType::Literal , lexeme: "3" },
+        Token { ttype: TokenType::RParen , lexeme: "" },
+    ]));
 }
 
 fn parse_token(text: &str) -> Parsed<Token> {
@@ -67,10 +102,7 @@ fn parse_token(text: &str) -> Parsed<Token> {
         return parse_identifier(text);
     }
     match c {
-        ' ' => match parse_spaced_binary(text) {
-            Some(b) => Some(b),
-            None => parse_space(text),
-        },
+        ' ' => parse_space(text),
         '\n' => parse_newline(text),
         '[' => parse_lbracket(text),
         ']' => parse_rbracket(text),
@@ -84,9 +116,28 @@ fn parse_token(text: &str) -> Parsed<Token> {
 }
 
 #[test]
-fn _token() {
-    dbg!("?");
-    assert_eq!(parse("2 *2"), None)
+fn _parse_token() {
+    assert_eq!(parse("2 *2"), Some(vec![
+        Token { ttype: TokenType::Literal, lexeme: "2" },
+        Token { ttype: TokenType::Space, lexeme: " " },
+        Token { ttype: TokenType::Binary, lexeme: "*" },
+        Token { ttype: TokenType::Literal, lexeme: "2" },
+    ]))
+}
+
+#[test]
+fn _paren_token() {
+    let parsed = parse("2 *2");
+    let actual = parsed.map(|ts|parenthesize(ts)).flatten();
+    assert_eq!(actual, Some(vec![
+        Token { ttype: TokenType::LParen, lexeme: "" },
+        Token { ttype: TokenType::Literal, lexeme: "2" },
+        Token { ttype: TokenType::RParen, lexeme: "" },
+        Token { ttype: TokenType::Binary, lexeme: "*" },
+        Token { ttype: TokenType::LParen, lexeme: "" },
+        Token { ttype: TokenType::Literal, lexeme: "2" },
+        Token { ttype: TokenType::RParen, lexeme: "" },
+    ]));
 }
 
 const SYMBOLS: &str = "!@$%^&*|\"';,./+-";

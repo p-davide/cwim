@@ -10,6 +10,8 @@ pub enum Expr {
     Binary(Binary),
     Variable(String),
     Unary(Unary),
+    LParen,
+    RParen,
 }
 
 impl Debug for Expr {
@@ -19,6 +21,8 @@ impl Debug for Expr {
             Expr::Binary(n) => write!(f, "B{:?}", n),
             Expr::Variable(n) => write!(f, "V{:?}", n),
             Expr::Unary(n) => write!(f, "U{:?}", n),
+            Expr::LParen => write!(f, "("),
+            Expr::RParen => write!(f, ")"),
         }
     }
 }
@@ -33,6 +37,28 @@ pub fn understand(tokens: Vec<Token>) -> Option<Vec<Expr>> {
         }
     }
     Some(result)
+}
+
+#[test]
+fn _understand() {
+    let parsed = crate::parser::parse("234*5+7*8-18^3");
+    let parenthesized = parsed.map(|p|crate::parser::parenthesize(p)).flatten();
+    let actual = parenthesized.map(|p|understand(p)).flatten();
+    assert_eq!(actual, Some(vec![
+        Expr::LParen,
+        Expr::Literal(234.),
+        Expr::Binary(MUL),
+        Expr::Literal(5.),
+        Expr::Binary(ADD),
+        Expr::Literal(7.),
+        Expr::Binary(MUL),
+        Expr::Literal(8.),
+        Expr::Binary(SUB),
+        Expr::Literal(18.),
+        Expr::Binary(POW),
+        Expr::Literal(3.),
+        Expr::RParen,
+    ]))
 }
 
 fn understand_one(tok: Token) -> Option<Expr> {
@@ -50,16 +76,10 @@ fn understand_one(tok: Token) -> Option<Expr> {
             "^" => Some(Expr::Binary(POW)),
             _ => None,
         },
-        TokenType::SpacedBinary => match tok.lexeme {
-            " + " => Some(Expr::Binary(ADD.minus_pred(10))),
-            " - " => Some(Expr::Binary(SUB.minus_pred(10))),
-            " * " => Some(Expr::Binary(MUL.minus_pred(10))),
-            " / " => Some(Expr::Binary(DIV.minus_pred(10))),
-            " ^ " => Some(Expr::Binary(POW.minus_pred(10))),
-            _ => None,
-        },
+        TokenType::LParen => Some(Expr::LParen),
+        TokenType::RParen => Some(Expr::RParen),
         TokenType::Error => None,
-        _ => unimplemented!(),
+        ttype => unimplemented!("{:?}", ttype),
     }
 }
 
@@ -68,10 +88,14 @@ fn understand_one(tok: Token) -> Option<Expr> {
 pub fn shuntingyard(exprs: Vec<Expr>) -> Option<Vec<Expr>> {
     let mut result = vec![];
     let mut ops: Vec<Binary> = vec![];
+    let mut balance = 0;
     for expr in exprs {
         match expr {
+            Expr::LParen => balance += 1,
+            Expr::RParen => balance -= 1,
             Expr::Literal(_) | Expr::Variable(_) => result.push(expr),
-            Expr::Binary(b) => {
+            Expr::Binary(mut b) => {
+                b.precedence += 20 * balance;
                 while let Some(op) = ops.last() {
                     // NOTE: This assumes every operator is left-associative.
                     if b.precedence <= op.precedence {
@@ -82,6 +106,7 @@ pub fn shuntingyard(exprs: Vec<Expr>) -> Option<Vec<Expr>> {
                 }
                 ops.push(b)
             }
+            expr => unimplemented!("{:?}",expr)
         }
     }
     while let Some(op) = ops.pop() {
