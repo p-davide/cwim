@@ -7,6 +7,97 @@ struct ParseState<'a> {
 
 pub type Parsed<T> = Option<T>;
 
+impl<'a> ParseState<'a> {
+    fn str(&mut self, expected: &str, ttype: TokenType) -> Parsed<()> {
+        let n = expected.len();
+        if self.to_parse.starts_with(expected) {
+            self.tokens.push(Token {
+                ttype: ttype,
+                lexeme: &self.to_parse[..n],
+            });
+            self.to_parse = &self.to_parse[n..];
+            Some(())
+        } else {
+            None
+        }
+    }
+
+    fn lp(&mut self) -> Parsed<()> {
+        self.str("(", TokenType::LParen)
+    }
+
+    fn rp(&mut self) -> Parsed<()> {
+        self.str(")", TokenType::RParen)
+    }
+
+    fn pat<F: Fn(char) -> bool>(&mut self, maybe_ttype: Option<TokenType>, pred: F) -> Parsed<()> {
+        let trimmed = self.to_parse.trim_start_matches(pred);
+        let n = self.to_parse.len() - trimmed.len();
+        if trimmed == self.to_parse {
+            None
+        } else {
+            if let Some(ttype) = maybe_ttype {
+                self.tokens.push(Token {
+                    ttype: ttype,
+                    lexeme: &self.to_parse[..n],
+                });
+            }
+            self.to_parse = trimmed;
+            Some(())
+        }
+    }
+
+    // lp space? lhs rhs* rp
+    fn top(&mut self) -> Parsed<()> {
+        self.lp()?;
+        self.spaces();
+        dbg!(&self.tokens);
+        self.lhs()?;
+        dbg!(&self.tokens);
+        self.zero_plus_rhs()?;
+        dbg!(&self.tokens);
+        self.rp()
+    }
+
+    fn zero_plus_rhs(&mut self) -> Parsed<()> {
+        while let Some(_) = self.rhs() {
+            continue;
+        }
+        Some(())
+    }
+
+    fn spaces(&mut self) -> Parsed<()> {
+        self.pat(Some(TokenType::Space), |c| c.is_ascii_whitespace())
+    }
+
+    // (space? bin space? side space?)
+    fn rhs(&mut self) -> Parsed<()> {
+        self.spaces();
+        self.pat(Some(TokenType::Binary), |c| SYMBOLS.contains(c))?;
+        self.spaces();
+        self.lhs()?;
+        self.spaces()
+    }
+
+    // lit | top
+    fn lhs(&mut self) -> Parsed<()> {
+        self.lit().or_else(||self.top())
+    }
+
+    fn lit(&mut self) -> Parsed<()> {
+        self.pat(Some(TokenType::Literal), |c: char| c.is_ascii_digit())
+    }
+}
+
+pub fn parse2(text: &str) -> Parsed<Vec<Token>> {
+    let mut state = ParseState {
+        to_parse: text,
+        tokens: vec![],
+    };
+    state.top();
+    Some(state.tokens)
+}
+
 pub fn parse(text: &str) -> Parsed<Vec<Token>> {
     let mut state = ParseState {
         to_parse: text,
@@ -25,6 +116,52 @@ pub fn parse(text: &str) -> Parsed<Vec<Token>> {
         }
     }
     Some(state.tokens)
+}
+
+#[derive(Debug, PartialEq, Eq, PartialOrd, Ord)]
+struct Ordered<T> {
+    priority: usize,
+    t: T,
+}
+
+const PRIORITY_BRACKETS: usize = 10;
+
+fn prioritize(tokens: Vec<Token>) -> Vec<Ordered<Token>> {
+    let mut result = vec![];
+    let mut balance = 0;
+    let mut increase = false;
+    for tok in tokens {
+        match tok.ttype {
+            TokenType::LParen => balance += 2,
+            TokenType::RParen => {
+                balance -= 2;
+                // account for " )"
+                if balance % 2 == 1 {
+                    balance += 1;
+                }
+            }
+            TokenType::Literal | TokenType::Identifier => {
+                result.push(Ordered {
+                    priority: 0,
+                    t: tok,
+                })
+            },
+            TokenType::Binary => result.push(Ordered {
+                priority: PRIORITY_BRACKETS * balance,
+                t: tok,
+            }),
+            TokenType::Space => {
+                if increase {
+                    balance += 1
+                } else {
+                    balance -= 1
+                };
+                increase = !increase;
+            }
+            tt => unimplemented!("{:?}", tt),
+        }
+    }
+    result
 }
 
 pub fn parenthesize(spaced: Vec<Token>) -> Option<Vec<Token>> {
@@ -54,10 +191,12 @@ pub fn parenthesize(spaced: Vec<Token>) -> Option<Vec<Token>> {
                     result.push(tok);
                 }
             }
-            TokenType::Space => if !ignore_space {
-                result.push(tok);
-            } else {
-                ignore_space = false;
+            TokenType::Space => {
+                if !ignore_space {
+                    result.push(tok);
+                } else {
+                    ignore_space = false;
+                }
             }
             _ => {
                 ignore_space = false;
@@ -72,22 +211,64 @@ pub fn parenthesize(spaced: Vec<Token>) -> Option<Vec<Token>> {
 #[test]
 fn _parenthesize() {
     let parsed = parse("234*5+7*8-18^3");
-    let actual = parsed.map(|ts|parenthesize(ts)).flatten();
-    assert_eq!(actual, Some(vec![
-        Token { ttype: TokenType::LParen , lexeme: "" },
-        Token { ttype: TokenType::Literal , lexeme: "234" },
-        Token { ttype: TokenType::Binary , lexeme: "*" },
-        Token { ttype: TokenType::Literal , lexeme: "5" },
-        Token { ttype: TokenType::Binary , lexeme: "+" },
-        Token { ttype: TokenType::Literal , lexeme: "7" },
-        Token { ttype: TokenType::Binary , lexeme: "*" },
-        Token { ttype: TokenType::Literal , lexeme: "8" },
-        Token { ttype: TokenType::Binary , lexeme: "-" },
-        Token { ttype: TokenType::Literal , lexeme: "18" },
-        Token { ttype: TokenType::Binary , lexeme: "^" },
-        Token { ttype: TokenType::Literal , lexeme: "3" },
-        Token { ttype: TokenType::RParen , lexeme: "" },
-    ]));
+    let actual = parsed.map(|ts| parenthesize(ts)).flatten();
+    assert_eq!(
+        actual,
+        Some(vec![
+            Token {
+                ttype: TokenType::LParen,
+                lexeme: ""
+            },
+            Token {
+                ttype: TokenType::Literal,
+                lexeme: "234"
+            },
+            Token {
+                ttype: TokenType::Binary,
+                lexeme: "*"
+            },
+            Token {
+                ttype: TokenType::Literal,
+                lexeme: "5"
+            },
+            Token {
+                ttype: TokenType::Binary,
+                lexeme: "+"
+            },
+            Token {
+                ttype: TokenType::Literal,
+                lexeme: "7"
+            },
+            Token {
+                ttype: TokenType::Binary,
+                lexeme: "*"
+            },
+            Token {
+                ttype: TokenType::Literal,
+                lexeme: "8"
+            },
+            Token {
+                ttype: TokenType::Binary,
+                lexeme: "-"
+            },
+            Token {
+                ttype: TokenType::Literal,
+                lexeme: "18"
+            },
+            Token {
+                ttype: TokenType::Binary,
+                lexeme: "^"
+            },
+            Token {
+                ttype: TokenType::Literal,
+                lexeme: "3"
+            },
+            Token {
+                ttype: TokenType::RParen,
+                lexeme: ""
+            },
+        ])
+    );
 }
 
 fn parse_token(text: &str) -> Parsed<Token> {
@@ -117,27 +298,74 @@ fn parse_token(text: &str) -> Parsed<Token> {
 
 #[test]
 fn _parse_token() {
-    assert_eq!(parse("2 *2"), Some(vec![
-        Token { ttype: TokenType::Literal, lexeme: "2" },
-        Token { ttype: TokenType::Space, lexeme: " " },
-        Token { ttype: TokenType::Binary, lexeme: "*" },
-        Token { ttype: TokenType::Literal, lexeme: "2" },
-    ]))
+    assert_eq!(
+        parse2("(2 *2)"),
+        Some(vec![
+            Token {
+                ttype: TokenType::LParen,
+                lexeme: "("
+            },
+            Token {
+                ttype: TokenType::Literal,
+                lexeme: "2"
+            },
+            Token {
+                ttype: TokenType::Space,
+                lexeme: " "
+            },
+            Token {
+                ttype: TokenType::Binary,
+                lexeme: "*"
+            },
+            Token {
+                ttype: TokenType::Literal,
+                lexeme: "2"
+            },
+            Token {
+                ttype: TokenType::RParen,
+                lexeme: ")"
+            },
+        ])
+    )
 }
 
 #[test]
 fn _paren_token() {
     let parsed = parse("2 *2");
-    let actual = parsed.map(|ts|parenthesize(ts)).flatten();
-    assert_eq!(actual, Some(vec![
-        Token { ttype: TokenType::LParen, lexeme: "" },
-        Token { ttype: TokenType::Literal, lexeme: "2" },
-        Token { ttype: TokenType::RParen, lexeme: "" },
-        Token { ttype: TokenType::Binary, lexeme: "*" },
-        Token { ttype: TokenType::LParen, lexeme: "" },
-        Token { ttype: TokenType::Literal, lexeme: "2" },
-        Token { ttype: TokenType::RParen, lexeme: "" },
-    ]));
+    let actual = parsed.map(|ts| parenthesize(ts)).flatten();
+    assert_eq!(
+        actual,
+        Some(vec![
+            Token {
+                ttype: TokenType::LParen,
+                lexeme: ""
+            },
+            Token {
+                ttype: TokenType::Literal,
+                lexeme: "2"
+            },
+            Token {
+                ttype: TokenType::RParen,
+                lexeme: ""
+            },
+            Token {
+                ttype: TokenType::Binary,
+                lexeme: "*"
+            },
+            Token {
+                ttype: TokenType::LParen,
+                lexeme: ""
+            },
+            Token {
+                ttype: TokenType::Literal,
+                lexeme: "2"
+            },
+            Token {
+                ttype: TokenType::RParen,
+                lexeme: ""
+            },
+        ])
+    );
 }
 
 const SYMBOLS: &str = "!@$%^&*|\"';,./+-";

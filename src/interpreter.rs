@@ -88,14 +88,10 @@ fn understand_one(tok: Token) -> Option<Expr> {
 pub fn shuntingyard(exprs: Vec<Expr>) -> Option<Vec<Expr>> {
     let mut result = vec![];
     let mut ops: Vec<Binary> = vec![];
-    let mut balance = 0;
     for expr in exprs {
         match expr {
-            Expr::LParen => balance += 1,
-            Expr::RParen => balance -= 1,
             Expr::Literal(_) | Expr::Variable(_) => result.push(expr),
-            Expr::Binary(mut b) => {
-                b.precedence += 20 * balance;
+            Expr::Binary(b) => {
                 while let Some(op) = ops.last() {
                     // NOTE: This assumes every operator is left-associative.
                     if b.precedence <= op.precedence {

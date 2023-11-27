@@ -15,16 +15,6 @@ impl Debug for Binary {
     }
 }
 
-impl Binary {
-    pub fn minus_pred(&mut self, prec: usize) -> Self {
-        Self {
-            name: self.name,
-            f: self.f,
-            precedence: self.precedence - prec,
-        }
-    }
-}
-
 pub const ADD: Binary = Binary {
     name: "+",
     f: |y, x| x + y,
