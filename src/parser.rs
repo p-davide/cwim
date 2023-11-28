@@ -115,7 +115,7 @@ fn parse_comment(text: &str) -> Parsed<Token> {
 fn parse_number(text: &str) -> Parsed<Token> {
     let mut l: usize = 0;
     for c in text.chars() {
-        if c.is_ascii_digit() {
+        if c.is_ascii_digit() || c == '.' {
             l += 1;
         } else {
             break;

@@ -45,6 +45,20 @@ impl<'a> ParseState<'a> {
         }
     }
 
+    fn number(&mut self) -> Parsed<()> {
+        let mut i = 1;
+        let mut result: f64 = std::f64::NAN;
+        while let Ok(n) = &self.to_parse[0..i].parse::<f64>() {
+            result = *n;
+            i += 1;
+        }
+        if result.is_nan() {
+            Err("NaN".to_owned())
+        } else {
+            Ok(())
+        }
+    }
+
     // lp space? lhs rhs* rp
     #[allow(unused_must_use)]
     fn top(&mut self) -> Parsed<()> {
