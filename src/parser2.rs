@@ -14,9 +14,9 @@ impl<'a> ParseState<'a> {
                 lexeme: &self.to_parse[..n],
             });
             self.to_parse = &self.to_parse[n..];
-            Some(())
+            Ok(())
         } else {
-            None
+            Err("".to_owned())
         }
     }
 
@@ -32,7 +32,7 @@ impl<'a> ParseState<'a> {
         let trimmed = self.to_parse.trim_start_matches(pred);
         let n = self.to_parse.len() - trimmed.len();
         if trimmed == self.to_parse {
-            None
+            Err("".to_owned())
         } else {
             if let Some(ttype) = maybe_ttype {
                 self.tokens.push(Token {
@@ -41,11 +41,12 @@ impl<'a> ParseState<'a> {
                 });
             }
             self.to_parse = trimmed;
-            Some(())
+            Ok(())
         }
     }
 
     // lp space? lhs rhs* rp
+    #[allow(unused_must_use)]
     fn top(&mut self) -> Parsed<()> {
         self.lp()?;
         self.spaces();
@@ -58,10 +59,10 @@ impl<'a> ParseState<'a> {
     }
 
     fn zero_plus_rhs(&mut self) -> Parsed<()> {
-        while let Some(_) = self.rhs() {
+        while let Ok(_) = self.rhs() {
             continue;
         }
-        Some(())
+        Ok(())
     }
 
     fn spaces(&mut self) -> Parsed<()> {
@@ -69,6 +70,7 @@ impl<'a> ParseState<'a> {
     }
 
     // (space? bin space? side space?)
+    #[allow(unused_must_use)]
     fn rhs(&mut self) -> Parsed<()> {
         self.spaces();
         self.pat(Some(TokenType::Binary), |c| SYMBOLS.contains(c))?;
@@ -79,7 +81,7 @@ impl<'a> ParseState<'a> {
 
     // lit | top
     fn lhs(&mut self) -> Parsed<()> {
-        self.lit().or_else(|| self.top())
+        self.lit().or_else(|_| self.top())
     }
 
     fn lit(&mut self) -> Parsed<()> {
@@ -93,38 +95,43 @@ pub fn parse(text: &str) -> Parsed<Vec<Token>> {
         tokens: vec![],
     };
     state.top()?;
-    Some(state.tokens)
+    Ok(state.tokens)
 }
 
-#[test]
-fn _parse_token() {
-    assert_eq!(
-        parse("(2 *2)"),
-        Some(vec![
-            Token {
-                ttype: TokenType::LParen,
-                lexeme: "("
-            },
-            Token {
-                ttype: TokenType::Literal,
-                lexeme: "2"
-            },
-            Token {
-                ttype: TokenType::Space,
-                lexeme: " "
-            },
-            Token {
-                ttype: TokenType::Binary,
-                lexeme: "*"
-            },
-            Token {
-                ttype: TokenType::Literal,
-                lexeme: "2"
-            },
-            Token {
-                ttype: TokenType::RParen,
-                lexeme: ")"
-            },
-        ])
-    )
+#[cfg(test)]
+mod test {
+    use super::*;
+
+    #[test]
+    fn _parse_token() {
+        assert_eq!(
+            parse("(2 *2)"),
+            Ok(vec![
+                Token {
+                    ttype: TokenType::LParen,
+                    lexeme: "("
+                },
+                Token {
+                    ttype: TokenType::Literal,
+                    lexeme: "2"
+                },
+                Token {
+                    ttype: TokenType::Space,
+                    lexeme: " "
+                },
+                Token {
+                    ttype: TokenType::Binary,
+                    lexeme: "*"
+                },
+                Token {
+                    ttype: TokenType::Literal,
+                    lexeme: "2"
+                },
+                Token {
+                    ttype: TokenType::RParen,
+                    lexeme: ")"
+                },
+            ])
+        )
+    }
 }

@@ -1,20 +1,23 @@
 use crate::token::*;
 
-pub type Parsed<T> = Option<T>;
+pub type Parsed<T> = Result<T, String>;
 
 pub fn parse(text: &str) -> Parsed<Vec<Token>> {
     let mut to_parse = text;
     let mut tokens = vec![];
     while to_parse.len() != 0 {
-        let token = parse_token(to_parse).filter(|t| t.ttype != TokenType::Error)?;
+        let token = parse_token(to_parse)?;
+        if token.ttype == TokenType::Error {
+            return Err("Received synthetic error".to_owned());
+        }
         tokens.push(token);
         to_parse = &to_parse[token.lexeme.len()..];
     }
-    Some(tokens)
+    Ok(tokens)
 }
 
 fn parse_token(text: &str) -> Parsed<Token> {
-    let c = text.chars().nth(0)?;
+    let c = text.chars().nth(0).ok_or("Tried to parse empty token")?;
     if c.is_ascii_digit() {
         return parse_number(text);
     }
@@ -34,21 +37,22 @@ fn parse_token(text: &str) -> Parsed<Token> {
         ',' => parse_comma(text),
         ';' => parse_semicolon(text),
         '#' => parse_comment(text),
-        _ => None,
+        _ => Err(format!("Can't parse '{}'", c)),
     }
 }
 
 pub const SYMBOLS: &str = "!@$%^&*|\"';,./+-";
 
-fn parse_char(c: char, ttype: TokenType, text: &str) -> Parsed<Token> {
-    if text.chars().nth(0) == Some(c) {
+fn parse_char(expected: char, ttype: TokenType, text: &str) -> Parsed<Token> {
+    let actual = text.chars().nth(0).ok_or("Tried to parse empty token")?;
+    if expected == actual {
         let token = Token {
             ttype: ttype,
             lexeme: &text[..1],
         };
-        Some(token)
+        Ok(token)
     } else {
-        None
+        Err(format!("found: {}, expected: {}", actual, expected))
     }
 }
 
@@ -92,19 +96,19 @@ fn parse_comment(text: &str) -> Parsed<Token> {
                 ttype: TokenType::Comment,
                 lexeme: &text[..l],
             };
-            return Some(token);
+            return Ok(token);
         } else {
             l = l + 1;
         }
     }
     if l == 0 {
-        None
+        Err("empty comment".to_owned())
     } else {
         let token = Token {
             ttype: TokenType::Comment,
             lexeme: &text[..l],
         };
-        Some(token)
+        Ok(token)
     }
 }
 
@@ -118,13 +122,13 @@ fn parse_number(text: &str) -> Parsed<Token> {
         }
     }
     if l == 0 {
-        None
+        Err("empty number".to_owned())
     } else {
         let token = Token {
             ttype: TokenType::Literal,
             lexeme: &text[..l],
         };
-        Some(token)
+        Ok(token)
     }
 }
 
@@ -138,24 +142,25 @@ fn parse_identifier(text: &str) -> Parsed<Token> {
         }
     }
     if l == 0 {
-        None
+        Err("empty identifier".to_owned())
     } else {
         let token = Token {
             ttype: TokenType::Identifier,
             lexeme: &text[..l],
         };
-        Some(token)
+        Ok(token)
     }
 }
 
 fn parse_binary<'a>(text: &'a str) -> Parsed<Token<'a>> {
-    if SYMBOLS.contains(text.chars().nth(0).expect("there should be a char here")) {
+    let actual = text.chars().nth(0).ok_or("there should be a char here")?;
+    if SYMBOLS.contains(actual) {
         let token = Token {
             ttype: TokenType::Binary,
             lexeme: &text[..1],
         };
-        Some(token)
+        Ok(token)
     } else {
-        None
+        Err(format!("expected binary, found: {}", actual))
     }
 }
