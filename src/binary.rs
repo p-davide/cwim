@@ -6,12 +6,19 @@ use std::fmt::Formatter;
 pub struct Binary {
     pub name: &'static str,
     pub f: fn(f64, f64) -> f64,
-    pub precedence: usize,
+    pub precedence: i32,
 }
 
 impl Debug for Binary {
     fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), std::fmt::Error> {
         write!(f, "[{}:{}]", self.name, self.precedence)
+    }
+}
+
+impl Binary {
+    pub fn prioritize(&mut self, priority: i32) -> Self {
+        self.precedence += priority;
+        *self
     }
 }
 

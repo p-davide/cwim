@@ -1,4 +1,6 @@
 use crate::binary::*;
+use crate::parser::*;
+use crate::prioritize::*;
 use crate::token::*;
 use crate::unary::*;
 use std::fmt::Debug;
@@ -27,11 +29,11 @@ impl Debug for Expr {
     }
 }
 
-pub fn understand(tokens: Vec<Token>) -> Option<Vec<Expr>> {
+pub fn understand(tokens: Vec<Prioritized<Token>>) -> Option<Vec<Expr>> {
     let mut result: Vec<Expr> = vec![];
     for tok in tokens {
         // TODO: multiline expressions
-        if tok.ttype != TokenType::Newline {
+        if tok.t.ttype != TokenType::Newline {
             let expr = understand_one(tok)?;
             result.push(expr);
         }
@@ -41,11 +43,9 @@ pub fn understand(tokens: Vec<Token>) -> Option<Vec<Expr>> {
 
 #[test]
 fn _understand() {
-    let parsed = crate::parser::parse("234*5+7*8-18^3");
-    let parenthesized = parsed.map(|p|crate::parser::parenthesize(p)).flatten();
-    let actual = parenthesized.map(|p|understand(p)).flatten();
-    assert_eq!(actual, Some(vec![
-        Expr::LParen,
+    let parsed = parse("234*5+7*8-18^3").expect("didn't parse");
+    let ordered = prioritize(parsed);
+    assert_eq!(understand(ordered), Some(vec![
         Expr::Literal(234.),
         Expr::Binary(MUL),
         Expr::Literal(5.),
@@ -57,23 +57,22 @@ fn _understand() {
         Expr::Literal(18.),
         Expr::Binary(POW),
         Expr::Literal(3.),
-        Expr::RParen,
     ]))
 }
 
-fn understand_one(tok: Token) -> Option<Expr> {
-    match tok.ttype {
-        TokenType::Literal => match tok.lexeme.parse::<f64>() {
+fn understand_one(tok: Prioritized<Token>) -> Option<Expr> {
+    match tok.t.ttype {
+        TokenType::Literal => match tok.t.lexeme.parse::<f64>() {
             Ok(n) => Some(Expr::Literal(n)),
             Err(_) => None,
         },
-        TokenType::Identifier => Some(Expr::Variable(tok.lexeme.to_owned())),
-        TokenType::Binary => match tok.lexeme {
-            "+" => Some(Expr::Binary(ADD)),
-            "-" => Some(Expr::Binary(SUB)),
-            "*" => Some(Expr::Binary(MUL)),
-            "/" => Some(Expr::Binary(DIV)),
-            "^" => Some(Expr::Binary(POW)),
+        TokenType::Identifier => Some(Expr::Variable(tok.t.lexeme.to_owned())),
+        TokenType::Binary => match tok.t.lexeme {
+            "+" => Some(Expr::Binary(ADD.clone().prioritize(tok.priority))),
+            "-" => Some(Expr::Binary(SUB.clone().prioritize(tok.priority))),
+            "*" => Some(Expr::Binary(MUL.clone().prioritize(tok.priority))),
+            "/" => Some(Expr::Binary(DIV.clone().prioritize(tok.priority))),
+            "^" => Some(Expr::Binary(POW.clone().prioritize(tok.priority))),
             _ => None,
         },
         TokenType::LParen => Some(Expr::LParen),
