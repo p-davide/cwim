@@ -21,13 +21,17 @@ fn parse_token(text: &str) -> Parsed<Token> {
     if c.is_ascii_digit() {
         return parse_number(text);
     }
-    if SYMBOLS.contains(c) {
-        return parse_binary(text);
-    }
     if c.is_ascii_alphabetic() {
         return parse_identifier(text);
     }
     match c {
+        '-' => {
+            if let Ok(t) = parse_number(text) {
+                Ok(t)
+            } else {
+                parse_binary(text)
+            }
+        }
         ' ' => parse_space(text),
         '\n' => parse_newline(text),
         '[' => parse_lbracket(text),
@@ -37,7 +41,13 @@ fn parse_token(text: &str) -> Parsed<Token> {
         ',' => parse_comma(text),
         ';' => parse_semicolon(text),
         '#' => parse_comment(text),
-        _ => Err(format!("Can't parse '{}'", c)),
+        _ => {
+            if SYMBOLS.contains(c) {
+                parse_binary(text)
+            } else {
+                Err(format!("Can't parse '{}'", c))
+            }
+        }
     }
 }
 
@@ -115,18 +125,22 @@ fn parse_comment(text: &str) -> Parsed<Token> {
 fn parse_number(text: &str) -> Parsed<Token> {
     let mut l: usize = 0;
     for c in text.chars() {
-        if c.is_ascii_digit() || c == '.' {
+        if c.is_ascii_digit() || c == '.' || (l == 0 && c == '-') {
             l += 1;
         } else {
             break;
         }
+    }
+    let lexeme = &text[..l];
+    if lexeme == "-" {
+        return Err("minus sign not part of negative number".to_owned());
     }
     if l == 0 {
         Err("empty number".to_owned())
     } else {
         let token = Token {
             ttype: TokenType::Literal,
-            lexeme: &text[..l],
+            lexeme: lexeme,
         };
         Ok(token)
     }
@@ -175,8 +189,29 @@ mod test {
         assert_eq!(
             actual,
             Ok(vec![
-                "234", "*", "5", "+", "7", "*", "8", "-", "18", "^", "3",
+                "234", "*", "5", "+", "7", "*", "8", "-18", "^", "3",
             ])
         );
+    }
+
+    #[test]
+    fn _a() {
+        let to_parse = "-(5+6)";
+        let actual = parse(to_parse).map(|ts| ts.iter().map(|t| t.lexeme).collect());
+        assert_eq!(actual, Ok(vec!["-", "(", "5", "+", "6", ")"]));
+    }
+
+    #[test]
+    fn _b() {
+        let to_parse = "-1 +4";
+        let actual = parse(to_parse).map(|ts| ts.iter().map(|t| t.lexeme).collect());
+        assert_eq!(actual, Ok(vec!["-1", " ", "+", "4"]));
+    }
+
+    #[test]
+    fn _c() {
+        let to_parse = "-( -1 +4)";
+        let actual = parse(to_parse).map(|ts| ts.iter().map(|t| t.lexeme).collect());
+        assert_eq!(actual, Ok(vec!["-", "(", " ", "-1", " ", "+", "4", ")"]));
     }
 }
