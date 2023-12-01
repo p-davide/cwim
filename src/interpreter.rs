@@ -58,7 +58,7 @@ fn understand_one(tok: Prioritized<Token>) -> Parsed<Expr> {
         },
         TokenType::LParen => Ok(Expr::LParen),
         TokenType::RParen => Ok(Expr::RParen),
-        TokenType::Error => Err("received synthetic error".to_owned()),
+        TokenType::Error => Err(tok.t.lexeme.to_owned()),
         ttype => unimplemented!("{:?}", ttype),
     }
 }

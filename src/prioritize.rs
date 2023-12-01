@@ -32,6 +32,12 @@ pub fn prioritize(tokens: Vec<Token>) -> Vec<Prioritized<Token>> {
             TokenType::LParen => balance += 2,
             TokenType::RParen => {
                 balance -= 2;
+                if balance < -1 {
+                    result.push(Prioritized::ignore(Token {
+                        ttype: TokenType::Error,
+                        lexeme: "unmatched )",
+                    }))
+                }
                 // account for " )"
                 if balance % 2 == 1 {
                     balance += 1;
