@@ -28,7 +28,6 @@ pub fn prioritize(tokens: Vec<Token>) -> Vec<Prioritized<Token>> {
     let mut result: Vec<Prioritized<Token>> = vec![];
     let mut balance = 0;
     for tok in tokens {
-        dbg!(result.clone());
         match tok.ttype {
             TokenType::LParen => balance += 2,
             TokenType::RParen => {

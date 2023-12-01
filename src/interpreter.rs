@@ -108,6 +108,14 @@ pub fn eval(shunted: Vec<Expr>) -> crate::parser::Parsed<f64> {
     stack.pop().ok_or("empty stack".to_owned())
 }
 
+pub fn run(text: &str) -> Parsed<f64> {
+    let tks = parse(text)?;
+    let parens = prioritize(tks);
+    let exprs = understand(parens)?;
+    let s = shuntingyard(exprs)?;
+    eval(s)
+}
+
 #[cfg(test)]
 mod test {
     use super::*;
