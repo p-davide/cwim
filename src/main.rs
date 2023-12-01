@@ -19,17 +19,6 @@ mod test {
     }
 
     #[test]
-    fn _parse() {
-        let actual = parse("234*5+7*8-18^3").map(|ts| ts.iter().map(|t| t.lexeme).collect());
-        assert_eq!(
-            actual,
-            Ok(vec![
-                "234", "*", "5", "+", "7", "*", "8", "-", "18", "^", "3",
-            ])
-        );
-    }
-
-    #[test]
     fn _run_basic() {
         _test_run("234*5+7*8-18^3", 234. * 5. + 7. * 8. - (18 as f64).powf(3.));
     }

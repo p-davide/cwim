@@ -164,3 +164,19 @@ fn parse_binary<'a>(text: &'a str) -> Parsed<Token<'a>> {
         Err(format!("expected binary, found: {}", actual))
     }
 }
+
+#[cfg(test)]
+mod test {
+    use super::*;
+
+    #[test]
+    fn _parse() {
+        let actual = parse("234*5+7*8-18^3").map(|ts| ts.iter().map(|t| t.lexeme).collect());
+        assert_eq!(
+            actual,
+            Ok(vec![
+                "234", "*", "5", "+", "7", "*", "8", "-", "18", "^", "3",
+            ])
+        );
+    }
+}
