@@ -13,11 +13,11 @@ impl std::fmt::Debug for Prioritized<Token<'_>> {
 }
 
 impl<T> Prioritized<T> {
-    pub fn ignore(t: T) -> Self {
+    fn ignore(t: T) -> Self {
         Self { priority: 0, t: t }
     }
 
-    pub fn was_spaced(&self) -> bool {
+    fn was_spaced(&self) -> bool {
         (self.priority / PRIORITY_BRACKETS) % 2 != 0
     }
 }
@@ -113,8 +113,17 @@ pub fn prioritize(tokens: Vec<Token>) -> Vec<Prioritized<Token>> {
                     }
                 }
             }
+            TokenType::Comment => {
+                break;
+            }
             tt => unimplemented!("{:?}", tt),
         }
+    }
+    while let Some(last) = result.last() {
+        if last.t.ttype != TokenType::Space {
+            break;
+        }
+        result.pop().unwrap();
     }
     result
 }

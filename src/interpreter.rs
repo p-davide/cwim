@@ -7,7 +7,7 @@ use std::fmt::Debug;
 use std::fmt::Formatter;
 
 #[derive(PartialEq, Clone)]
-pub enum Expr {
+enum Expr {
     Literal(f64),
     Binary(Binary),
     Variable(String),
@@ -29,7 +29,7 @@ impl Debug for Expr {
     }
 }
 
-pub fn understand(tokens: Vec<Prioritized<Token>>) -> Parsed<Vec<Expr>> {
+fn understand(tokens: Vec<Prioritized<Token>>) -> Parsed<Vec<Expr>> {
     let mut result: Vec<Expr> = vec![];
     for tok in tokens {
         // TODO: multiline expressions
@@ -65,7 +65,7 @@ fn understand_one(tok: Prioritized<Token>) -> Parsed<Expr> {
 
 // -- precedence
 
-pub fn shuntingyard(exprs: Vec<Expr>) -> Parsed<Vec<Expr>> {
+fn shuntingyard(exprs: Vec<Expr>) -> Parsed<Vec<Expr>> {
     let mut result = vec![];
     let mut ops: Vec<Binary> = vec![];
     for expr in exprs {
@@ -91,7 +91,7 @@ pub fn shuntingyard(exprs: Vec<Expr>) -> Parsed<Vec<Expr>> {
     Ok(result)
 }
 
-pub fn eval(shunted: Vec<Expr>) -> crate::parser::Parsed<f64> {
+fn eval(shunted: Vec<Expr>) -> crate::parser::Parsed<f64> {
     let mut stack = vec![];
     for expr in shunted {
         match expr {
