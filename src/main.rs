@@ -2,8 +2,7 @@ use cwim::interpreter::*;
 use inquire::Text;
 
 fn main() {
-    loop {
-        let line = Text::new("").prompt().expect("invalid cwim");
+    while let Ok(line) = Text::new("").prompt() {
         match run(&line) {
             Ok(result) => println!("{}", result),
             Err(msg) => eprintln!("{}", msg),
