@@ -27,12 +27,13 @@ fn shuntingyard(exprs: Vec<Expr>) -> Parsed<Vec<Expr>> {
     let mut result = vec![];
     let mut ops: Vec<Function> = vec![];
     for expr in exprs {
+        dbg!(expr.clone());
         match expr {
-            Expr::Literal(_) | Expr::Variable(_) => result.push(expr),
+            Expr::Literal(_) => result.push(expr),
             Expr::Function(b) => {
                 while let Some(op) = ops.last() {
                     // NOTE: This assumes every operator is left-associative.
-                    if b.precedence <= op.precedence {
+                    if b.precedence < op.precedence {
                         result.push(Expr::Function(
                             ops.pop().ok_or("no expressions".to_owned())?,
                         ))
@@ -45,10 +46,12 @@ fn shuntingyard(exprs: Vec<Expr>) -> Parsed<Vec<Expr>> {
             Expr::Error(msg) => return Err(msg),
             expr => unimplemented!("{:?}", expr),
         }
+        dbg!(result.clone(), ops.clone(), "---");
     }
     while let Some(op) = ops.pop() {
         result.push(Expr::Function(op))
     }
+    dbg!(result.clone());
     Ok(result)
 }
 
@@ -89,6 +92,38 @@ pub fn run(text: &str) -> Parsed<f64> {
 #[cfg(test)]
 mod test {
     use super::*;
+
+    #[test]
+    fn _eval_3() {
+        assert_eq!(
+            eval(vec![
+                Expr::Literal(2.),
+                Expr::Literal(4.),
+                Expr::Function(POW),
+                Expr::Literal(5.),
+                Expr::Function(MUL),
+                Expr::Literal(6.),
+                Expr::Literal(1.),
+                Expr::Literal(9.),
+                Expr::Function(POW),
+                Expr::Function(ADD),
+                Expr::Function(ADD),
+            ]),
+            eval(vec![
+                Expr::Literal(2.),
+                Expr::Literal(4.),
+                Expr::Function(POW),
+                Expr::Literal(5.),
+                Expr::Function(MUL),
+                Expr::Literal(6.),
+                Expr::Function(ADD),
+                Expr::Literal(1.),
+                Expr::Literal(9.),
+                Expr::Function(POW),
+                Expr::Function(ADD),
+            ])
+        );
+    }
     #[test]
     fn _shuntingyard() {
         assert_eq!(
@@ -104,6 +139,7 @@ mod test {
             ])
         );
     }
+    
     #[test]
     fn _shuntingyard_2() {
         assert_eq!(
@@ -151,10 +187,10 @@ mod test {
                 Expr::Literal(5.0),
                 Expr::Function(MUL),
                 Expr::Literal(6.0),
-                Expr::Function(ADD),
                 Expr::Literal(1.0),
                 Expr::Literal(9.0),
                 Expr::Function(POW),
+                Expr::Function(ADD),
                 Expr::Function(ADD),
             ])
         );
@@ -196,12 +232,15 @@ mod test {
     // " -(6) * -(6)"
     #[test]
     fn _eval_2() {
-        assert_eq!(eval(vec![
+        assert_eq!(
+            eval(vec![
                 Expr::Literal(6.),
                 Expr::Function(NEG),
                 Expr::Literal(6.),
                 Expr::Function(NEG),
                 Expr::Function(MUL.prioritize(-PRIORITY_SPACE)),
-            ]), Ok(36.));
+            ]),
+            Ok(36.)
+        );
     }
 }

@@ -55,3 +55,10 @@ fn _unmatched_parens() {
 fn _spaces_brackets_and_negations() {
     _test_run(" -(6) * -(6)", 36.);
 }
+
+#[test]
+fn _double_unary() {
+    _test_run("cos cos 0", (1 as f64).cos());
+    _test_run("cos(cos 0)", (1 as f64).cos());
+    _test_run("cos(cos(0))", (1 as f64).cos());
+}
