@@ -1,6 +1,6 @@
-#[derive(PartialEq, Eq, Debug, Copy, Clone)]
+#[derive(PartialEq, Debug, Copy, Clone)]
 pub enum TokenType {
-    Literal,
+    Literal(f64),
     Identifier,
     Binary,
     Space,
@@ -20,7 +20,7 @@ pub const ERROR: Token = Token {
     lexeme: ""
 };
 
-#[derive(PartialEq, Eq, Debug, Copy, Clone)]
+#[derive(PartialEq, Debug, Copy, Clone)]
 pub struct Token<'t> {
     pub ttype: TokenType,
     pub lexeme: &'t str,

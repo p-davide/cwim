@@ -135,11 +135,15 @@ fn parse_number(text: &str) -> Parsed<Token> {
     if lexeme == "-" {
         return Err("minus sign not part of negative number".to_owned());
     }
+    let parsed = lexeme.parse::<f64>();
+    if let Err(_) = parsed {
+        return Err(format!("failed to parse '{}'", lexeme));
+    }
     if l == 0 {
         Err("empty number".to_owned())
     } else {
         let token = Token {
-            ttype: TokenType::Literal,
+            ttype: TokenType::Literal(parsed.unwrap()),
             lexeme: lexeme,
         };
         Ok(token)
@@ -188,9 +192,7 @@ mod test {
         let actual = parse("234*5+7*8-18^3").map(|ts| ts.iter().map(|t| t.lexeme).collect());
         assert_eq!(
             actual,
-            Ok(vec![
-                "234", "*", "5", "+", "7", "*", "8", "-18", "^", "3",
-            ])
+            Ok(vec!["234", "*", "5", "+", "7", "*", "8", "-18", "^", "3",])
         );
     }
 
@@ -213,5 +215,63 @@ mod test {
         let to_parse = "-( -1 +4)";
         let actual = parse(to_parse).map(|ts| ts.iter().map(|t| t.lexeme).collect());
         assert_eq!(actual, Ok(vec!["-", "(", " ", "-1", " ", "+", "4", ")"]));
+    }
+    //" -(6) * -(6)"
+    #[test]
+    fn _d() {
+        let to_parse = " -(6) * -(6)";
+        assert_eq!(
+            parse(to_parse),
+            Ok(vec![
+                Token {
+                    ttype: TokenType::Space,
+                    lexeme: " "
+                },
+                Token {
+                    ttype: TokenType::Binary,
+                    lexeme: "-"
+                },
+                Token {
+                    ttype: TokenType::LParen,
+                    lexeme: "("
+                },
+                Token {
+                    ttype: TokenType::Literal(6.),
+                    lexeme: "6"
+                },
+                Token {
+                    ttype: TokenType::RParen,
+                    lexeme: ")"
+                },
+                Token {
+                    ttype: TokenType::Space,
+                    lexeme: " "
+                },
+                Token {
+                    ttype: TokenType::Binary,
+                    lexeme: "*"
+                },
+                Token {
+                    ttype: TokenType::Space,
+                    lexeme: " "
+                },
+                Token {
+                    ttype: TokenType::Binary,
+                    lexeme: "-"
+                },
+                Token {
+                    ttype: TokenType::LParen,
+                    lexeme: "("
+                },
+                Token {
+                    ttype: TokenType::Literal(6.),
+                    lexeme: "6"
+                },
+                Token {
+                    ttype: TokenType::RParen,
+                    lexeme: ")"
+                },
+            ])
+        );
     }
 }

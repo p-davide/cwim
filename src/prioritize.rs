@@ -1,122 +1,119 @@
+use crate::function::*;
+use crate::interpreter::Expr;
 use crate::token::*;
 
-#[derive(PartialEq, Eq, PartialOrd, Ord, Clone, Copy)]
-pub struct Prioritized<T> {
-    pub priority: i32,
-    pub t: T,
-}
+pub const PRIORITY_SPACE: i32 = 10;
+pub const PRIORITY_PAREN: i32 = 2 * PRIORITY_SPACE;
 
-impl std::fmt::Debug for Prioritized<Token<'_>> {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::result::Result<(), std::fmt::Error> {
-        write!(f, "{}'{}'", self.priority, self.t.lexeme)
-    }
-}
-
-impl<T> Prioritized<T> {
-    fn ignore(t: T) -> Self {
-        Self { priority: 0, t: t }
-    }
-
-    fn was_spaced(&self) -> bool {
-        (self.priority / PRIORITY_BRACKETS) % 2 != 0
-    }
-}
-
-const PRIORITY_BRACKETS: i32 = 10;
-
-pub fn prioritize(tokens: Vec<Token>) -> Vec<Prioritized<Token>> {
-    let mut result: Vec<Prioritized<Token>> = vec![];
+pub fn prioritize(tokens: Vec<Token>) -> Vec<Expr> {
+    let mut stack: Vec<Option<Expr>> = vec![];
     let mut balance = 0;
+    let binary = |f: Function, balance: i32| (f.clone().prioritize(PRIORITY_SPACE * balance));
+    let from_lexeme = |l: &str, balance: i32| match l {
+        "+" => binary(ADD, balance),
+        "-" => binary(SUB, balance),
+        "*" => binary(MUL, balance),
+        "/" => binary(DIV, balance),
+        "^" => binary(POW, balance),
+        _ => unimplemented!("binary operation '{}'", l),
+    };
     for tok in tokens {
+        dbg!(stack.clone());
         match tok.ttype {
             TokenType::LParen => balance += 2,
             TokenType::RParen => {
                 balance -= 2;
                 if balance < -1 {
-                    result.push(Prioritized::ignore(Token {
-                        ttype: TokenType::Error,
-                        lexeme: "unmatched )",
-                    }))
+                    stack.push(Some(Expr::Error("unmatched )".to_owned())));
                 }
                 // account for " )"
                 if balance % 2 == 1 {
                     balance += 1;
                 }
             }
-            TokenType::Literal => {
-                if let Some(last) = result.last() {
-                    // let last be a literal -2
-                    match last.t.ttype {
+            TokenType::Literal(n) => {
+                if let Some(last) = stack.last() {
+                    // let n = -2
+                    match last {
                         // ' -2'
-                        TokenType::Space => {
-                            result
-                                .pop()
-                                .expect("we matched on last, it should be there");
-                            if let Some(llast) = result.last() {
-                                match llast.t.ttype {
+                        None => {
+                            stack.pop().unwrap();
+                            if let Some(llast) = stack.last() {
+                                match llast {
                                     // '8 -2'
-                                    TokenType::Literal => {
-                                        result.push(Prioritized::ignore(Token {
-                                            lexeme: &tok.lexeme[..1],
-                                            ttype: TokenType::Binary,
-                                        }));
-                                        result.push(Prioritized::ignore(Token {
-                                            lexeme: &tok.lexeme[1..],
-                                            ttype: TokenType::Literal,
-                                        }));
+                                    Some(Expr::Literal(_)) => {
+                                        stack.push(Some(Expr::Function(
+                                            binary(ADD, balance).prioritize(-PRIORITY_SPACE),
+                                        )));
+                                        stack.push(Some(Expr::Literal(n)))
                                     }
                                     // '5* -2', ' -2', ...
                                     _ => {
-                                        result.push(Prioritized::ignore(tok));
+                                        stack.push(Some(Expr::Literal(n)))
                                     }
                                 }
                             }
                         }
                         // '5-2'
-                        TokenType::Literal => {
-                            result.push(Prioritized::ignore(Token {
-                                lexeme: &tok.lexeme[..1],
-                                ttype: TokenType::Binary,
-                            }));
-                            result.push(Prioritized::ignore(Token {
-                                lexeme: &tok.lexeme[1..],
-                                ttype: TokenType::Literal,
-                            }));
+                        Some(Expr::Literal(_)) => {
+                            stack.push(Some(Expr::Function(binary(ADD, balance))));
+                            stack.push(Some(Expr::Literal(n)));
                         }
                         _ => {
-                            result.push(Prioritized::ignore(tok));
+                            stack.push(Some(Expr::Literal(n)));
                         }
                     }
                 } else {
-                    result.push(Prioritized::ignore(tok));
+                    stack.push(Some(Expr::Literal(n)));
                 }
             }
+            TokenType::Identifier => match tok.lexeme {
+                "cos" => stack.push(Some(Expr::Function(
+                    COS.clone().prioritize(PRIORITY_SPACE * balance),
+                ))),
+                tt => unimplemented!("{:?}", tt),
+            },
             TokenType::Binary => {
-                let mut bin = Prioritized {
-                    priority: PRIORITY_BRACKETS * balance,
-                    t: tok,
-                };
-                if let Some(space) = result.last() {
-                    if space.t.ttype == TokenType::Space {
-                        bin.priority -= PRIORITY_BRACKETS;
-                        result.pop().expect("result.last() was checked?");
+                let mut bin = from_lexeme(tok.lexeme, balance);
+                match stack.last() {
+                    None => stack.push(Some(Expr::Function(
+                        NEG.clone().prioritize(PRIORITY_SPACE * balance),
+                    ))),
+                    Some(None) => {
+                        bin.precedence -= PRIORITY_SPACE;
+                        stack.pop().expect("result.last() was checked?");
+                        if tok.lexeme == "-" {
+                            match stack.last() {
+                                None | Some(Some(Expr::Function(_))) => stack.push(Some(Expr::Function(
+                                    NEG.clone().prioritize(PRIORITY_SPACE * balance),
+                                ))),
+                                Some(None) => unreachable!("two space tokens in a row"),
+                                _ => stack.push(Some(Expr::Function(bin))),
+                            }
+                        } else {
+                            stack.push(Some(Expr::Function(bin)));
+                        }
                     }
-                } else {
-                    // The expression starts with a -, so we emit a 0
-                    result.push(Prioritized::ignore(Token {
-                        ttype: TokenType::Literal,
-                        lexeme: "0",
-                    }))
+                    // Transform SUB into NEG
+                    Some(Some(Expr::Function(_))) => {
+                        if tok.lexeme == "-" {
+                            stack.push(Some(Expr::Function(
+                                NEG.clone().prioritize(PRIORITY_SPACE * balance),
+                            )));
+                        }
+                    }
+                    _ => stack.push(Some(Expr::Function(bin))),
                 }
-                result.push(bin);
             }
             TokenType::Space => {
-                if let Some(bin) = result.last_mut() {
-                    if bin.t.ttype == TokenType::Binary && !bin.was_spaced() {
-                        bin.priority -= PRIORITY_BRACKETS;
-                    } else if bin.t.ttype != TokenType::Binary {
-                        result.push(Prioritized::ignore(tok));
+                if let Some(Some(Expr::Function(bin))) = stack.last_mut() {
+                    if bin.arity == 2 && !bin.was_spaced() {
+                        bin.prioritize(-PRIORITY_SPACE);
+                    } else {
+                        stack.push(None);
                     }
+                } else {
+                    stack.push(None);
                 }
             }
             TokenType::Comment => {
@@ -125,11 +122,11 @@ pub fn prioritize(tokens: Vec<Token>) -> Vec<Prioritized<Token>> {
             tt => unimplemented!("{:?}", tt),
         }
     }
-    while let Some(last) = result.last() {
-        if last.t.ttype != TokenType::Space {
-            break;
+    let mut result = vec![];
+    for space_or_expr in stack {
+        if let Some(expr) = space_or_expr {
+            result.push(expr);
         }
-        result.pop().unwrap();
     }
     result
 }
@@ -142,7 +139,7 @@ mod test {
     fn _simple_priority() {
         let it @ [n, minus, m] = [
             Token {
-                ttype: TokenType::Literal,
+                ttype: TokenType::Literal(8.),
                 lexeme: "8",
             },
             Token {
@@ -150,20 +147,13 @@ mod test {
                 lexeme: "-",
             },
             Token {
-                ttype: TokenType::Literal,
+                ttype: TokenType::Literal(9.),
                 lexeme: "9",
             },
         ];
         assert_eq!(
             prioritize(Vec::from(it)),
-            vec![
-                Prioritized { priority: 0, t: n },
-                Prioritized {
-                    priority: 0,
-                    t: minus
-                },
-                Prioritized { priority: 0, t: m },
-            ]
+            vec![Expr::Literal(8.), Expr::Function(SUB), Expr::Literal(9.),]
         );
     }
 
@@ -171,7 +161,7 @@ mod test {
     fn _with_spaces() {
         let it @ [n, _, minus, _, m] = [
             Token {
-                ttype: TokenType::Literal,
+                ttype: TokenType::Literal(8.),
                 lexeme: "8",
             },
             Token {
@@ -187,32 +177,30 @@ mod test {
                 lexeme: " ",
             },
             Token {
-                ttype: TokenType::Literal,
+                ttype: TokenType::Literal(9.),
                 lexeme: "9",
             },
         ];
         assert_eq!(
             prioritize(Vec::from(it)),
             vec![
-                Prioritized { priority: 0, t: n },
-                Prioritized {
-                    priority: -PRIORITY_BRACKETS,
-                    t: minus
-                },
-                Prioritized { priority: 0, t: m },
+                Expr::Literal(8.),
+                Expr::Function(SUB.prioritize(-PRIORITY_SPACE)),
+                Expr::Literal(9.),
             ]
         );
     }
 
+    // (5+ -6)-7
     #[test]
-    fn _b() {
-        let it @ [_lp, five, plus, _, msix, _rp, _mseven] = [
+    fn _parens_and_spaces() {
+        let it = [
             Token {
                 ttype: TokenType::LParen,
                 lexeme: "(",
             },
             Token {
-                ttype: TokenType::Literal,
+                ttype: TokenType::Literal(5.),
                 lexeme: "5",
             },
             Token {
@@ -224,7 +212,7 @@ mod test {
                 lexeme: " ",
             },
             Token {
-                ttype: TokenType::Literal,
+                ttype: TokenType::Literal(-6.),
                 lexeme: "-6",
             },
             Token {
@@ -232,40 +220,26 @@ mod test {
                 lexeme: ")",
             },
             Token {
-                ttype: TokenType::Literal,
+                ttype: TokenType::Literal(-7.),
                 lexeme: "-7",
             },
         ];
         assert_eq!(
-            prioritize(Vec::from(it)),
+            prioritize(Vec::from(it)), // (5+ -6)-7
             vec![
-                Prioritized::ignore(five),
-                Prioritized {
-                    priority: PRIORITY_BRACKETS,
-                    t: plus
-                },
-                Prioritized::ignore(msix),
-                Prioritized {
-                    priority: 0,
-                    t: Token {
-                        ttype: TokenType::Binary,
-                        lexeme: "-"
-                    }
-                },
-                Prioritized {
-                    priority: 0,
-                    t: Token {
-                        ttype: TokenType::Literal,
-                        lexeme: "7"
-                    }
-                },
+                Expr::Literal(5.),
+                Expr::Function(ADD.prioritize(PRIORITY_PAREN - PRIORITY_SPACE)),
+                Expr::Literal(-6.),
+                Expr::Function(ADD),
+                Expr::Literal(-7.),
             ]
         )
     }
 
+    // -(5+ -6)-7
     #[test]
-    fn _c() {
-        let it @ [neg, _lp, five, plus, _, msix, _rp, _mseven] = [
+    fn _neg_parens_and_spaces() {
+        let it = [
             Token {
                 ttype: TokenType::Binary,
                 lexeme: "-",
@@ -275,7 +249,7 @@ mod test {
                 lexeme: "(",
             },
             Token {
-                ttype: TokenType::Literal,
+                ttype: TokenType::Literal(5.),
                 lexeme: "5",
             },
             Token {
@@ -287,7 +261,7 @@ mod test {
                 lexeme: " ",
             },
             Token {
-                ttype: TokenType::Literal,
+                ttype: TokenType::Literal(-6.),
                 lexeme: "-6",
             },
             Token {
@@ -295,45 +269,84 @@ mod test {
                 lexeme: ")",
             },
             Token {
-                ttype: TokenType::Literal,
+                ttype: TokenType::Literal(-7.),
                 lexeme: "-7",
             },
         ];
         assert_eq!(
             prioritize(Vec::from(it)),
             vec![
-                Prioritized {
-                    priority: 0,
-                    t: Token {
-                        ttype: TokenType::Literal,
-                        lexeme: "0",
-                    }
-                },
-                Prioritized {
-                    priority: 0,
-                    t: neg,
-                },
-                Prioritized::ignore(five),
-                Prioritized {
-                    priority: PRIORITY_BRACKETS,
-                    t: plus,
-                },
-                Prioritized::ignore(msix),
-                Prioritized {
-                    priority: 0,
-                    t: Token {
-                        ttype: TokenType::Binary,
-                        lexeme: "-",
-                    }
-                },
-                Prioritized {
-                    priority: 0,
-                    t: Token {
-                        ttype: TokenType::Literal,
-                        lexeme: "7",
-                    }
-                },
+                Expr::Function(NEG),
+                Expr::Literal(5.),
+                Expr::Function(ADD.prioritize(PRIORITY_SPACE)),
+                Expr::Literal(-6.),
+                Expr::Function(ADD),
+                Expr::Literal(-7.),
             ]
         )
+    }
+
+    // " -(6) * -(6)"
+    #[test]
+    fn _nsix() {
+        assert_eq!(
+            prioritize(vec![
+                Token {
+                    ttype: TokenType::Space,
+                    lexeme: " "
+                },
+                Token {
+                    ttype: TokenType::Binary,
+                    lexeme: "-"
+                },
+                Token {
+                    ttype: TokenType::LParen,
+                    lexeme: "("
+                },
+                Token {
+                    ttype: TokenType::Literal(6.),
+                    lexeme: "6"
+                },
+                Token {
+                    ttype: TokenType::RParen,
+                    lexeme: ")"
+                },
+                Token {
+                    ttype: TokenType::Space,
+                    lexeme: " "
+                },
+                Token {
+                    ttype: TokenType::Binary,
+                    lexeme: "*"
+                },
+                Token {
+                    ttype: TokenType::Space,
+                    lexeme: " "
+                },
+                Token {
+                    ttype: TokenType::Binary,
+                    lexeme: "-"
+                },
+                Token {
+                    ttype: TokenType::LParen,
+                    lexeme: "("
+                },
+                Token {
+                    ttype: TokenType::Literal(6.),
+                    lexeme: "6"
+                },
+                Token {
+                    ttype: TokenType::RParen,
+                    lexeme: ")"
+                },
+            ]),
+            vec![
+                Expr::Function(NEG),
+                Expr::Literal(6.),
+                Expr::Function(MUL.prioritize(-PRIORITY_SPACE)),
+                Expr::Function(NEG),
+                Expr::Literal(6.),
+            ]
+        );
     }
 }
