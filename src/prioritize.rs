@@ -48,9 +48,7 @@ pub fn prioritize(tokens: Vec<Token>) -> Vec<Expr> {
                                         stack.push(Some(Expr::Literal(n)))
                                     }
                                     // '5* -2', ' -2', ...
-                                    _ => {
-                                        stack.push(Some(Expr::Literal(n)))
-                                    }
+                                    _ => stack.push(Some(Expr::Literal(n))),
                                 }
                             }
                         }
@@ -84,9 +82,11 @@ pub fn prioritize(tokens: Vec<Token>) -> Vec<Expr> {
                         stack.pop().expect("result.last() was checked?");
                         if tok.lexeme == "-" {
                             match stack.last() {
-                                None | Some(Some(Expr::Function(_))) => stack.push(Some(Expr::Function(
-                                    NEG.clone().prioritize(PRIORITY_SPACE * balance),
-                                ))),
+                                None | Some(Some(Expr::Function(_))) => {
+                                    stack.push(Some(Expr::Function(
+                                        NEG.clone().prioritize(PRIORITY_SPACE * balance),
+                                    )))
+                                }
                                 Some(None) => unreachable!("two space tokens in a row"),
                                 _ => stack.push(Some(Expr::Function(bin))),
                             }
@@ -137,19 +137,10 @@ mod test {
 
     #[test]
     fn _simple_priority() {
-        let it @ [n, minus, m] = [
-            Token {
-                ttype: TokenType::Literal(8.),
-                lexeme: "8",
-            },
-            Token {
-                ttype: TokenType::Binary,
-                lexeme: "-",
-            },
-            Token {
-                ttype: TokenType::Literal(9.),
-                lexeme: "9",
-            },
+        let it = [
+            Token::lit(8., "8."),
+            Token::bin("-"),
+            Token::lit(9., "9"),
         ];
         assert_eq!(
             prioritize(Vec::from(it)),
@@ -159,27 +150,12 @@ mod test {
 
     #[test]
     fn _with_spaces() {
-        let it @ [n, _, minus, _, m] = [
-            Token {
-                ttype: TokenType::Literal(8.),
-                lexeme: "8",
-            },
-            Token {
-                ttype: TokenType::Space,
-                lexeme: " ",
-            },
-            Token {
-                ttype: TokenType::Binary,
-                lexeme: "-",
-            },
-            Token {
-                ttype: TokenType::Space,
-                lexeme: " ",
-            },
-            Token {
-                ttype: TokenType::Literal(9.),
-                lexeme: "9",
-            },
+        let it = [
+            Token::lit(8., "8."),
+            Token::space(),
+            Token::bin("-"),
+            Token::space(),
+            Token::lit(9., "9"),
         ];
         assert_eq!(
             prioritize(Vec::from(it)),
@@ -195,34 +171,13 @@ mod test {
     #[test]
     fn _parens_and_spaces() {
         let it = [
-            Token {
-                ttype: TokenType::LParen,
-                lexeme: "(",
-            },
-            Token {
-                ttype: TokenType::Literal(5.),
-                lexeme: "5",
-            },
-            Token {
-                ttype: TokenType::Binary,
-                lexeme: "+",
-            },
-            Token {
-                ttype: TokenType::Space,
-                lexeme: " ",
-            },
-            Token {
-                ttype: TokenType::Literal(-6.),
-                lexeme: "-6",
-            },
-            Token {
-                ttype: TokenType::RParen,
-                lexeme: ")",
-            },
-            Token {
-                ttype: TokenType::Literal(-7.),
-                lexeme: "-7",
-            },
+            Token::lparen(),
+            Token::lit(5., "5"),
+            Token::bin("+"),
+            Token::space(),
+            Token::lit(-6., "-6"),
+            Token::rparen(),
+            Token::lit(-7., "-7"),
         ];
         assert_eq!(
             prioritize(Vec::from(it)), // (5+ -6)-7
@@ -240,38 +195,14 @@ mod test {
     #[test]
     fn _neg_parens_and_spaces() {
         let it = [
-            Token {
-                ttype: TokenType::Binary,
-                lexeme: "-",
-            },
-            Token {
-                ttype: TokenType::LParen,
-                lexeme: "(",
-            },
-            Token {
-                ttype: TokenType::Literal(5.),
-                lexeme: "5",
-            },
-            Token {
-                ttype: TokenType::Binary,
-                lexeme: "+",
-            },
-            Token {
-                ttype: TokenType::Space,
-                lexeme: " ",
-            },
-            Token {
-                ttype: TokenType::Literal(-6.),
-                lexeme: "-6",
-            },
-            Token {
-                ttype: TokenType::RParen,
-                lexeme: ")",
-            },
-            Token {
-                ttype: TokenType::Literal(-7.),
-                lexeme: "-7",
-            },
+            Token::bin("-"),
+            Token::lparen(),
+            Token::lit(5., "5"),
+            Token::bin("+"),
+            Token::space(),
+            Token::lit(-6., "-6"),
+            Token::rparen(),
+            Token::lit(-7., "-7"),
         ];
         assert_eq!(
             prioritize(Vec::from(it)),
@@ -291,54 +222,18 @@ mod test {
     fn _nsix() {
         assert_eq!(
             prioritize(vec![
-                Token {
-                    ttype: TokenType::Space,
-                    lexeme: " "
-                },
-                Token {
-                    ttype: TokenType::Binary,
-                    lexeme: "-"
-                },
-                Token {
-                    ttype: TokenType::LParen,
-                    lexeme: "("
-                },
-                Token {
-                    ttype: TokenType::Literal(6.),
-                    lexeme: "6"
-                },
-                Token {
-                    ttype: TokenType::RParen,
-                    lexeme: ")"
-                },
-                Token {
-                    ttype: TokenType::Space,
-                    lexeme: " "
-                },
-                Token {
-                    ttype: TokenType::Binary,
-                    lexeme: "*"
-                },
-                Token {
-                    ttype: TokenType::Space,
-                    lexeme: " "
-                },
-                Token {
-                    ttype: TokenType::Binary,
-                    lexeme: "-"
-                },
-                Token {
-                    ttype: TokenType::LParen,
-                    lexeme: "("
-                },
-                Token {
-                    ttype: TokenType::Literal(6.),
-                    lexeme: "6"
-                },
-                Token {
-                    ttype: TokenType::RParen,
-                    lexeme: ")"
-                },
+                Token::space(),
+                Token::bin("-"),
+                Token::lparen(),
+                Token::lit(6., "6"),
+                Token::rparen(),
+                Token::space(),
+                Token::bin("*"),
+                Token::space(),
+                Token::bin("-"),
+                Token::lparen(),
+                Token::lit(6., "6"),
+                Token::rparen(),
             ]),
             vec![
                 Expr::Function(NEG),

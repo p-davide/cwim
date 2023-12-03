@@ -56,11 +56,7 @@ pub const SYMBOLS: &str = "!@$%^&*|\"';,./+-";
 fn parse_char(expected: char, ttype: TokenType, text: &str) -> Parsed<Token> {
     let actual = text.chars().nth(0).ok_or("Tried to parse empty token")?;
     if expected == actual {
-        let token = Token {
-            ttype: ttype,
-            lexeme: &text[..1],
-        };
-        Ok(token)
+        Ok(Token::new(ttype, &text[..1]))
     } else {
         Err(format!("found: {}, expected: {}", actual, expected))
     }
@@ -102,11 +98,7 @@ fn parse_comment(text: &str) -> Parsed<Token> {
     let mut l: usize = 0;
     for c in text.chars() {
         if c == '\n' {
-            let token = Token {
-                ttype: TokenType::Comment,
-                lexeme: &text[..l],
-            };
-            return Ok(token);
+            return Ok(Token::new(TokenType::Comment, &text[..l]));
         } else {
             l = l + 1;
         }
@@ -114,11 +106,7 @@ fn parse_comment(text: &str) -> Parsed<Token> {
     if l == 0 {
         Err("empty comment".to_owned())
     } else {
-        let token = Token {
-            ttype: TokenType::Comment,
-            lexeme: &text[..l],
-        };
-        Ok(token)
+        Ok(Token::new(TokenType::Comment, &text[..l]))
     }
 }
 
@@ -142,11 +130,7 @@ fn parse_number(text: &str) -> Parsed<Token> {
     if l == 0 {
         Err("empty number".to_owned())
     } else {
-        let token = Token {
-            ttype: TokenType::Literal(parsed.unwrap()),
-            lexeme: lexeme,
-        };
-        Ok(token)
+        Ok(Token::lit(parsed.unwrap(), lexeme))
     }
 }
 
@@ -162,22 +146,14 @@ fn parse_identifier(text: &str) -> Parsed<Token> {
     if l == 0 {
         Err("empty identifier".to_owned())
     } else {
-        let token = Token {
-            ttype: TokenType::Identifier,
-            lexeme: &text[..l],
-        };
-        Ok(token)
+        Ok(Token::new(TokenType::Identifier, &text[..l]))
     }
 }
 
 fn parse_binary<'a>(text: &'a str) -> Parsed<Token<'a>> {
     let actual = text.chars().nth(0).ok_or("there should be a char here")?;
     if SYMBOLS.contains(actual) {
-        let token = Token {
-            ttype: TokenType::Binary,
-            lexeme: &text[..1],
-        };
-        Ok(token)
+        Ok(Token::bin(&text[..1]))
     } else {
         Err(format!("expected binary, found: {}", actual))
     }
@@ -190,16 +166,38 @@ mod test {
     #[test]
     fn _parse() {
         let actual = parse("234*5+7*8-18^3").map(|ts| ts.iter().map(|t| t.lexeme).collect());
+        let expected: Parsed<Vec<Token>> = Ok(vec![
+            Token::lit(234., "234"),
+            Token::bin("*"),
+            Token::lit(5., "5"),
+            Token::bin("+"),
+            Token::lit(7., "7"),
+            Token::bin("*"),
+            Token::lit(8., "8"),
+            Token::lit(-18., "-18"),
+            Token::bin("^"),
+            Token::lit(3., "3"),
+        ]);
         assert_eq!(
             actual,
             Ok(vec!["234", "*", "5", "+", "7", "*", "8", "-18", "^", "3",])
         );
+        assert_eq!(parse("234*5+7*8-18^3"), expected);
     }
 
     #[test]
     fn _a() {
         let to_parse = "-(5+6)";
         let actual = parse(to_parse).map(|ts| ts.iter().map(|t| t.lexeme).collect());
+        let expected: Parsed<Vec<Token>> = Ok(vec![
+            Token::bin("-"),
+            Token::lparen(),
+            Token::lit(5., "5"),
+            Token::bin("+"),
+            Token::lit(6., "6"),
+            Token::rparen(),
+        ]);
+        assert_eq!(parse(to_parse), expected);
         assert_eq!(actual, Ok(vec!["-", "(", "5", "+", "6", ")"]));
     }
 
@@ -207,6 +205,13 @@ mod test {
     fn _b() {
         let to_parse = "-1 +4";
         let actual = parse(to_parse).map(|ts| ts.iter().map(|t| t.lexeme).collect());
+        let expected: Parsed<Vec<Token>> = Ok(vec![
+            Token::lit(-1., "-1"),
+            Token::space(),
+            Token::bin("+"),
+            Token::lit(4., "4"),
+        ]);
+        assert_eq!(parse(to_parse), expected);
         assert_eq!(actual, Ok(vec!["-1", " ", "+", "4"]));
     }
 
@@ -223,54 +228,18 @@ mod test {
         assert_eq!(
             parse(to_parse),
             Ok(vec![
-                Token {
-                    ttype: TokenType::Space,
-                    lexeme: " "
-                },
-                Token {
-                    ttype: TokenType::Binary,
-                    lexeme: "-"
-                },
-                Token {
-                    ttype: TokenType::LParen,
-                    lexeme: "("
-                },
-                Token {
-                    ttype: TokenType::Literal(6.),
-                    lexeme: "6"
-                },
-                Token {
-                    ttype: TokenType::RParen,
-                    lexeme: ")"
-                },
-                Token {
-                    ttype: TokenType::Space,
-                    lexeme: " "
-                },
-                Token {
-                    ttype: TokenType::Binary,
-                    lexeme: "*"
-                },
-                Token {
-                    ttype: TokenType::Space,
-                    lexeme: " "
-                },
-                Token {
-                    ttype: TokenType::Binary,
-                    lexeme: "-"
-                },
-                Token {
-                    ttype: TokenType::LParen,
-                    lexeme: "("
-                },
-                Token {
-                    ttype: TokenType::Literal(6.),
-                    lexeme: "6"
-                },
-                Token {
-                    ttype: TokenType::RParen,
-                    lexeme: ")"
-                },
+                Token::space(),
+                Token::bin("-"),
+                Token::lparen(),
+                Token::lit(6., "6"),
+                Token::rparen(),
+                Token::space(),
+                Token::bin("*"),
+                Token::space(),
+                Token::bin("-"),
+                Token::lparen(),
+                Token::lit(6., "6"),
+                Token::rparen(),
             ])
         );
     }
