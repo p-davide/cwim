@@ -15,11 +15,6 @@ pub enum TokenType {
     Error,
 }
 
-pub const ERROR: Token = Token {
-    ttype: TokenType::Error,
-    lexeme: "",
-};
-
 #[derive(PartialEq, Debug, Copy, Clone)]
 pub struct Token<'t> {
     pub ttype: TokenType,
@@ -33,7 +28,7 @@ impl<'t> Token<'t> {
             lexeme: lexeme,
         }
     }
-    
+
     pub fn lit(lit: f64, lexeme: &'t str) -> Self {
         Self::new(TokenType::Literal(lit), lexeme)
     }

@@ -18,7 +18,6 @@ pub fn prioritize(tokens: Vec<Token>) -> Vec<Expr> {
         _ => unimplemented!("binary operation '{}'", l),
     };
     for tok in tokens {
-        dbg!(stack.clone());
         match tok.ttype {
             TokenType::LParen => balance += 2,
             TokenType::RParen => {

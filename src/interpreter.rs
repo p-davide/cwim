@@ -9,8 +9,6 @@ pub enum Expr {
     Literal(f64),
     Function(Function),
     Variable(String),
-    LParen,
-    RParen,
     Error(String),
 }
 
@@ -20,8 +18,6 @@ impl Debug for Expr {
             Expr::Literal(n) => write!(f, "{:?}", n),
             Expr::Function(g) => write!(f, "{:?}", g),
             Expr::Variable(n) => write!(f, "V{:?}", n),
-            Expr::LParen => write!(f, "("),
-            Expr::RParen => write!(f, ")"),
             Expr::Error(msg) => write!(f, "Error: {:?}", msg),
         }
     }
@@ -56,7 +52,7 @@ fn shuntingyard(exprs: Vec<Expr>) -> Parsed<Vec<Expr>> {
     Ok(result)
 }
 
-fn eval(shunted: Vec<Expr>) -> crate::parser::Parsed<f64> {
+fn eval(shunted: Vec<Expr>) -> Parsed<f64> {
     let mut stack = vec![];
     for expr in shunted {
         match expr {
