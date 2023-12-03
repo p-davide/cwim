@@ -8,7 +8,7 @@ pub fn parse(text: &str) -> Parsed<Vec<Token>> {
     while to_parse.len() != 0 {
         let token = parse_token(to_parse)?;
         if token.ttype == TokenType::Error {
-            return Err("Received synthetic error".to_owned());
+            return Err(token.lexeme.to_owned());
         }
         tokens.push(token);
         to_parse = &to_parse[token.lexeme.len()..];
@@ -25,13 +25,7 @@ fn parse_token(text: &str) -> Parsed<Token> {
         return parse_identifier(text);
     }
     match c {
-        '-' => {
-            if let Ok(t) = parse_number(text) {
-                Ok(t)
-            } else {
-                parse_binary(text)
-            }
-        }
+        '-' => parse_number(text).or_else(|_| parse_symbol(text)),
         ' ' => parse_space(text),
         '\n' => parse_newline(text),
         '[' => parse_lbracket(text),
@@ -43,7 +37,7 @@ fn parse_token(text: &str) -> Parsed<Token> {
         '#' => parse_comment(text),
         _ => {
             if SYMBOLS.contains(c) {
-                parse_binary(text)
+                parse_symbol(text)
             } else {
                 Err(format!("Can't parse '{}'", c))
             }
@@ -150,10 +144,10 @@ fn parse_identifier(text: &str) -> Parsed<Token> {
     }
 }
 
-fn parse_binary<'a>(text: &'a str) -> Parsed<Token<'a>> {
+fn parse_symbol<'a>(text: &'a str) -> Parsed<Token<'a>> {
     let actual = text.chars().nth(0).ok_or("there should be a char here")?;
     if SYMBOLS.contains(actual) {
-        Ok(Token::bin(&text[..1]))
+        Ok(Token::sym(&text[..1]))
     } else {
         Err(format!("expected binary, found: {}", actual))
     }
@@ -168,14 +162,14 @@ mod test {
         let actual = parse("234*5+7*8-18^3").map(|ts| ts.iter().map(|t| t.lexeme).collect());
         let expected: Parsed<Vec<Token>> = Ok(vec![
             Token::lit(234., "234"),
-            Token::bin("*"),
+            Token::sym("*"),
             Token::lit(5., "5"),
-            Token::bin("+"),
+            Token::sym("+"),
             Token::lit(7., "7"),
-            Token::bin("*"),
+            Token::sym("*"),
             Token::lit(8., "8"),
             Token::lit(-18., "-18"),
-            Token::bin("^"),
+            Token::sym("^"),
             Token::lit(3., "3"),
         ]);
         assert_eq!(
@@ -190,10 +184,10 @@ mod test {
         let to_parse = "-(5+6)";
         let actual = parse(to_parse).map(|ts| ts.iter().map(|t| t.lexeme).collect());
         let expected: Parsed<Vec<Token>> = Ok(vec![
-            Token::bin("-"),
+            Token::sym("-"),
             Token::lparen(),
             Token::lit(5., "5"),
-            Token::bin("+"),
+            Token::sym("+"),
             Token::lit(6., "6"),
             Token::rparen(),
         ]);
@@ -208,7 +202,7 @@ mod test {
         let expected: Parsed<Vec<Token>> = Ok(vec![
             Token::lit(-1., "-1"),
             Token::space(),
-            Token::bin("+"),
+            Token::sym("+"),
             Token::lit(4., "4"),
         ]);
         assert_eq!(parse(to_parse), expected);
@@ -229,14 +223,14 @@ mod test {
             parse(to_parse),
             Ok(vec![
                 Token::space(),
-                Token::bin("-"),
+                Token::sym("-"),
                 Token::lparen(),
                 Token::lit(6., "6"),
                 Token::rparen(),
                 Token::space(),
-                Token::bin("*"),
+                Token::sym("*"),
                 Token::space(),
-                Token::bin("-"),
+                Token::sym("-"),
                 Token::lparen(),
                 Token::lit(6., "6"),
                 Token::rparen(),

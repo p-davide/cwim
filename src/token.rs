@@ -2,7 +2,7 @@
 pub enum TokenType {
     Literal(f64),
     Identifier,
-    Binary,
+    Symbol,
     Space,
     Comment,
     LParen,
@@ -33,8 +33,8 @@ impl<'t> Token<'t> {
         Self::new(TokenType::Literal(lit), lexeme)
     }
 
-    pub fn bin(lexeme: &'t str) -> Self {
-        Self::new(TokenType::Binary, lexeme)
+    pub fn sym(lexeme: &'t str) -> Self {
+        Self::new(TokenType::Symbol, lexeme)
     }
 
     #[cfg(test)]

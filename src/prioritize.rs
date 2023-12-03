@@ -70,7 +70,7 @@ pub fn prioritize(tokens: Vec<Token>) -> Vec<Expr> {
                 ))),
                 tt => unimplemented!("{:?}", tt),
             },
-            TokenType::Binary => {
+            TokenType::Symbol => {
                 let mut bin = from_lexeme(tok.lexeme, balance);
                 match stack.last() {
                     None => stack.push(Some(Expr::Function(
@@ -136,11 +136,7 @@ mod test {
 
     #[test]
     fn _simple_priority() {
-        let it = [
-            Token::lit(8., "8."),
-            Token::bin("-"),
-            Token::lit(9., "9"),
-        ];
+        let it = [Token::lit(8., "8."), Token::sym("-"), Token::lit(9., "9")];
         assert_eq!(
             prioritize(Vec::from(it)),
             vec![Expr::Literal(8.), Expr::Function(SUB), Expr::Literal(9.),]
@@ -152,7 +148,7 @@ mod test {
         let it = [
             Token::lit(8., "8."),
             Token::space(),
-            Token::bin("-"),
+            Token::sym("-"),
             Token::space(),
             Token::lit(9., "9"),
         ];
@@ -172,7 +168,7 @@ mod test {
         let it = [
             Token::lparen(),
             Token::lit(5., "5"),
-            Token::bin("+"),
+            Token::sym("+"),
             Token::space(),
             Token::lit(-6., "-6"),
             Token::rparen(),
@@ -194,10 +190,10 @@ mod test {
     #[test]
     fn _neg_parens_and_spaces() {
         let it = [
-            Token::bin("-"),
+            Token::sym("-"),
             Token::lparen(),
             Token::lit(5., "5"),
-            Token::bin("+"),
+            Token::sym("+"),
             Token::space(),
             Token::lit(-6., "-6"),
             Token::rparen(),
@@ -222,14 +218,14 @@ mod test {
         assert_eq!(
             prioritize(vec![
                 Token::space(),
-                Token::bin("-"),
+                Token::sym("-"),
                 Token::lparen(),
                 Token::lit(6., "6"),
                 Token::rparen(),
                 Token::space(),
-                Token::bin("*"),
+                Token::sym("*"),
                 Token::space(),
-                Token::bin("-"),
+                Token::sym("-"),
                 Token::lparen(),
                 Token::lit(6., "6"),
                 Token::rparen(),
