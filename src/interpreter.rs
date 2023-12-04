@@ -82,9 +82,9 @@ fn eval(shunted: Vec<Expr>) -> Parsed<f64> {
     stack.pop().ok_or("empty stack".to_owned())
 }
 
-pub fn run(text: &str) -> Parsed<f64> {
+pub fn run(text: &str, env: &crate::env::Env) -> Parsed<f64> {
     let tks = parse(text)?;
-    let parens = prioritize(tks);
+    let parens = prioritize(tks, env);
     let s = shuntingyard(parens)?;
     eval(s)
 }
@@ -139,7 +139,7 @@ mod test {
             ])
         );
     }
-    
+
     #[test]
     fn _shuntingyard_2() {
         assert_eq!(

@@ -5,18 +5,13 @@ use crate::token::*;
 pub const PRIORITY_SPACE: i32 = 10;
 pub const PRIORITY_PAREN: i32 = 2 * PRIORITY_SPACE;
 
-pub fn prioritize(tokens: Vec<Token>) -> Vec<Expr> {
+pub fn prioritize(tokens: Vec<Token>, env: &crate::env::Env) -> Vec<Expr> {
+    // Inside `stack`, `None` indicates a space.
     let mut stack: Vec<Option<Expr>> = vec![];
     let mut balance = 0;
-    let binary = |f: Function, balance: i32| (f.clone().prioritize(PRIORITY_SPACE * balance));
-    let from_lexeme = |l: &str, balance: i32| match l {
-        "+" => binary(ADD, balance),
-        "-" => binary(SUB, balance),
-        "*" => binary(MUL, balance),
-        "/" => binary(DIV, balance),
-        "^" => binary(POW, balance),
-        _ => unimplemented!("binary operation '{}'", l),
-    };
+    fn adjust(mut f: Function, balance: i32) -> Function {
+        f.prioritize(PRIORITY_SPACE * balance)
+    }
     for tok in tokens {
         match tok.ttype {
             TokenType::LParen => balance += 2,
@@ -42,7 +37,7 @@ pub fn prioritize(tokens: Vec<Token>) -> Vec<Expr> {
                                     // '8 -2'
                                     Some(Expr::Literal(_)) => {
                                         stack.push(Some(Expr::Function(
-                                            binary(ADD, balance).prioritize(-PRIORITY_SPACE),
+                                            adjust(ADD, balance).prioritize(-PRIORITY_SPACE),
                                         )));
                                         stack.push(Some(Expr::Literal(n)))
                                     }
@@ -53,7 +48,7 @@ pub fn prioritize(tokens: Vec<Token>) -> Vec<Expr> {
                         }
                         // '5-2'
                         Some(Expr::Literal(_)) => {
-                            stack.push(Some(Expr::Function(binary(ADD, balance))));
+                            stack.push(Some(Expr::Function(adjust(ADD, balance))));
                             stack.push(Some(Expr::Literal(n)));
                         }
                         _ => {
@@ -64,14 +59,17 @@ pub fn prioritize(tokens: Vec<Token>) -> Vec<Expr> {
                     stack.push(Some(Expr::Literal(n)));
                 }
             }
-            TokenType::Identifier => match tok.lexeme {
-                "cos" => stack.push(Some(Expr::Function(
-                    COS.clone().prioritize(PRIORITY_SPACE * balance),
-                ))),
-                tt => unimplemented!("{:?}", tt),
+            TokenType::Identifier => match env.expr(tok.lexeme) {
+                expr @ (Expr::Function(_) | Expr::Literal(_)) => stack.push(Some(expr)),
+                _ => stack.push(Some(Expr::Error(tok.lexeme.to_owned()))),
             },
             TokenType::Symbol => {
-                let mut bin = from_lexeme(tok.lexeme, balance);
+                let expr = env.expr(tok.lexeme);
+                let mut bin = if let Expr::Function(f) = expr {
+                    adjust(f, balance)
+                } else {
+                    unimplemented!("no function named {} found", tok.lexeme)
+                };
                 match stack.last() {
                     None => stack.push(Some(Expr::Function(
                         NEG.clone().prioritize(PRIORITY_SPACE * balance),
@@ -133,12 +131,13 @@ pub fn prioritize(tokens: Vec<Token>) -> Vec<Expr> {
 #[cfg(test)]
 mod test {
     use super::*;
+    use crate::env::*;
 
     #[test]
     fn _simple_priority() {
         let it = [Token::lit(8., "8."), Token::sym("-"), Token::lit(9., "9")];
         assert_eq!(
-            prioritize(Vec::from(it)),
+            prioritize(Vec::from(it), &Env::std()),
             vec![Expr::Literal(8.), Expr::Function(SUB), Expr::Literal(9.),]
         );
     }
@@ -153,7 +152,7 @@ mod test {
             Token::lit(9., "9"),
         ];
         assert_eq!(
-            prioritize(Vec::from(it)),
+            prioritize(Vec::from(it), &Env::std()),
             vec![
                 Expr::Literal(8.),
                 Expr::Function(SUB.prioritize(-PRIORITY_SPACE)),
@@ -175,7 +174,7 @@ mod test {
             Token::lit(-7., "-7"),
         ];
         assert_eq!(
-            prioritize(Vec::from(it)), // (5+ -6)-7
+            prioritize(Vec::from(it), &Env::std()), // (5+ -6)-7
             vec![
                 Expr::Literal(5.),
                 Expr::Function(ADD.prioritize(PRIORITY_PAREN - PRIORITY_SPACE)),
@@ -200,7 +199,7 @@ mod test {
             Token::lit(-7., "-7"),
         ];
         assert_eq!(
-            prioritize(Vec::from(it)),
+            prioritize(Vec::from(it), &Env::std()),
             vec![
                 Expr::Function(NEG),
                 Expr::Literal(5.),
@@ -216,20 +215,23 @@ mod test {
     #[test]
     fn _nsix() {
         assert_eq!(
-            prioritize(vec![
-                Token::space(),
-                Token::sym("-"),
-                Token::lparen(),
-                Token::lit(6., "6"),
-                Token::rparen(),
-                Token::space(),
-                Token::sym("*"),
-                Token::space(),
-                Token::sym("-"),
-                Token::lparen(),
-                Token::lit(6., "6"),
-                Token::rparen(),
-            ]),
+            prioritize(
+                vec![
+                    Token::space(),
+                    Token::sym("-"),
+                    Token::lparen(),
+                    Token::lit(6., "6"),
+                    Token::rparen(),
+                    Token::space(),
+                    Token::sym("*"),
+                    Token::space(),
+                    Token::sym("-"),
+                    Token::lparen(),
+                    Token::lit(6., "6"),
+                    Token::rparen(),
+                ],
+                &Env::std()
+            ),
             vec![
                 Expr::Function(NEG),
                 Expr::Literal(6.),
