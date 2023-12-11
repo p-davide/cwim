@@ -27,13 +27,12 @@ fn shuntingyard(exprs: Vec<Expr>) -> Parsed<Vec<Expr>> {
     let mut result = vec![];
     let mut ops: Vec<Function> = vec![];
     for expr in exprs {
-        dbg!(expr.clone());
         match expr {
             Expr::Literal(_) => result.push(expr),
             Expr::Function(b) => {
                 while let Some(op) = ops.last() {
                     // NOTE: This assumes every operator is left-associative.
-                    if b.precedence < op.precedence {
+                    if b.precedence <= op.precedence {
                         result.push(Expr::Function(
                             ops.pop().ok_or("no expressions".to_owned())?,
                         ))
@@ -46,12 +45,10 @@ fn shuntingyard(exprs: Vec<Expr>) -> Parsed<Vec<Expr>> {
             Expr::Error(msg) => return Err(msg),
             expr => unimplemented!("{:?}", expr),
         }
-        dbg!(result.clone(), ops.clone(), "---");
     }
     while let Some(op) = ops.pop() {
         result.push(Expr::Function(op))
     }
-    dbg!(result.clone());
     Ok(result)
 }
 
