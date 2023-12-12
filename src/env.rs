@@ -19,6 +19,8 @@ impl<'e> Env<'e> {
                 ("*", Variable::Function(MUL)),
                 ("/", Variable::Function(DIV)),
                 ("^", Variable::Function(POW)),
+                ("sqrt", Variable::Function(SQRT)),
+                ("cbrt", Variable::Function(CBRT)),
                 ("pi", Variable::Value(std::f64::consts::PI)),
                 ("cos", Variable::Function(COS)),
                 ("sin", Variable::Function(SIN)),

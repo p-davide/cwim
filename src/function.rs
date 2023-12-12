@@ -33,6 +33,20 @@ impl Function {
     }
 }
 
+pub const SQRT: Function = Function {
+    name: "sqrt",
+    arity: 1,
+    f: |x| x[0].sqrt(),
+    precedence: PRIORITY_SPACE + 2,
+};
+
+pub const CBRT: Function = Function {
+    name: "cbrt",
+    arity: 1,
+    f: |x| x[0].cbrt(),
+    precedence: PRIORITY_SPACE + 2,
+};
+
 pub const COS: Function = Function {
     name: "cos",
     arity: 1,
