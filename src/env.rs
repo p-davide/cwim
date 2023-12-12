@@ -50,7 +50,7 @@ impl<'e> Env<'e> {
         match var {
             Some(Variable::Function(f)) => Expr::Function(*f),
             Some(Variable::Value(n)) => Expr::Literal(*n),
-            None => unimplemented!("binary operation '{}'", l),
+            None => Expr::Error(format!("Can't find '{}'", l)),
         }
     }
 }
