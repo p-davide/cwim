@@ -37,112 +37,112 @@ pub const COS: Function = Function {
     name: "cos",
     arity: 1,
     f: |x| x[0].cos(),
-    precedence: PRIORITY_SPACE + 8,
+    precedence: PRIORITY_SPACE + 2,
 };
 
 pub const SIN: Function = Function {
     name: "sin",
     arity: 1,
     f: |x| x[0].sin(),
-    precedence: PRIORITY_SPACE + 8,
+    precedence: PRIORITY_SPACE + 2,
 };
 
 pub const TAN: Function = Function {
     name: "tan",
     arity: 1,
     f: |x| x[0].tan(),
-    precedence: PRIORITY_SPACE + 8,
+    precedence: PRIORITY_SPACE + 2,
 };
 
 pub const EXP: Function = Function {
     name: "exp",
     arity: 1,
     f: |x| x[0].exp(),
-    precedence: PRIORITY_SPACE + 8,
+    precedence: PRIORITY_SPACE + 2,
 };
 
 pub const LN: Function = Function {
     name: "ln",
     arity: 1,
     f: |x| x[0].ln(),
-    precedence: PRIORITY_SPACE + 8,
+    precedence: PRIORITY_SPACE + 2,
 };
 
 pub const LOG2: Function = Function {
     name: "log2",
     arity: 1,
     f: |x| x[0].log2(),
-    precedence: PRIORITY_SPACE + 8,
+    precedence: PRIORITY_SPACE + 2,
 };
 
 pub const ACOS: Function = Function {
     name: "acos",
     arity: 1,
     f: |x| x[0].acos(),
-    precedence: PRIORITY_SPACE + 8,
+    precedence: PRIORITY_SPACE + 2,
 };
 
 pub const ASIN: Function = Function {
     name: "asin",
     arity: 1,
     f: |x| x[0].asin(),
-    precedence: PRIORITY_SPACE + 8,
+    precedence: PRIORITY_SPACE + 2,
 };
 
 pub const ATAN: Function = Function {
     name: "atan",
     arity: 1,
     f: |x| x[0].atan(),
-    precedence: PRIORITY_SPACE + 8,
+    precedence: PRIORITY_SPACE + 2,
 };
 
 pub const COSH: Function = Function {
     name: "cosh",
     arity: 1,
     f: |x| x[0].cosh(),
-    precedence: PRIORITY_SPACE + 8,
+    precedence: PRIORITY_SPACE + 2,
 };
 
 pub const SINH: Function = Function {
     name: "sinh",
     arity: 1,
     f: |x| x[0].sinh(),
-    precedence: PRIORITY_SPACE + 8,
+    precedence: PRIORITY_SPACE + 2,
 };
 
 pub const TANH: Function = Function {
     name: "tanh",
     arity: 1,
     f: |x| x[0].tanh(),
-    precedence: PRIORITY_SPACE + 8,
+    precedence: PRIORITY_SPACE + 2,
 };
 
 pub const ACOSH: Function = Function {
     name: "acosh",
     arity: 1,
     f: |x| x[0].acosh(),
-    precedence: PRIORITY_SPACE + 8,
+    precedence: PRIORITY_SPACE + 2,
 };
 
 pub const ASINH: Function = Function {
     name: "asinh",
     arity: 1,
     f: |x| x[0].asinh(),
-    precedence: PRIORITY_SPACE + 8,
+    precedence: PRIORITY_SPACE + 2,
 };
 
 pub const ATANH: Function = Function {
     name: "atanh",
     arity: 1,
     f: |x| x[0].atanh(),
-    precedence: PRIORITY_SPACE + 8,
+    precedence: PRIORITY_SPACE + 2,
 };
 
 pub const NEG: Function = Function {
     name: "-",
     arity: 1,
     f: |x| -x[0],
-    precedence: PRIORITY_SPACE + 8,
+    precedence: PRIORITY_SPACE + 2,
 };
 
 pub const ADD: Function = Function {

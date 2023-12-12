@@ -31,8 +31,10 @@ fn shuntingyard(exprs: Vec<Expr>) -> Parsed<Vec<Expr>> {
             Expr::Literal(_) => result.push(expr),
             Expr::Function(b) => {
                 while let Some(op) = ops.last() {
-                    // NOTE: This assumes every operator is left-associative.
-                    if b.precedence <= op.precedence {
+                    // NOTE: This assumes:
+                    // - Every binary operator is left-associative.
+                    // - Every unary operator is right-associative.
+                    if b.arity == 2 && b.precedence <= op.precedence {
                         result.push(Expr::Function(
                             ops.pop().ok_or("no expressions".to_owned())?,
                         ))
@@ -43,7 +45,7 @@ fn shuntingyard(exprs: Vec<Expr>) -> Parsed<Vec<Expr>> {
                 ops.push(b)
             }
             Expr::Error(msg) => return Err(msg),
-            expr => unimplemented!("{:?}", expr),
+            other => unimplemented!("{:?}", other),
         }
     }
     while let Some(op) = ops.pop() {
@@ -156,38 +158,6 @@ mod test {
                 Expr::Literal(7.0),
                 Expr::Literal(8.0),
                 Expr::Function(MUL),
-                Expr::Function(ADD),
-            ])
-        );
-    }
-
-    #[test]
-    fn _shuntingyard_3() {
-        assert_eq!(
-            shuntingyard(vec![
-                Expr::Literal(2.0),
-                Expr::Function(POW),
-                Expr::Literal(4.0),
-                Expr::Function(MUL),
-                Expr::Literal(5.0),
-                Expr::Function(ADD),
-                Expr::Literal(6.0),
-                Expr::Function(ADD),
-                Expr::Literal(1.0),
-                Expr::Function(POW),
-                Expr::Literal(9.0),
-            ]),
-            Ok(vec![
-                Expr::Literal(2.0),
-                Expr::Literal(4.0),
-                Expr::Function(POW),
-                Expr::Literal(5.0),
-                Expr::Function(MUL),
-                Expr::Literal(6.0),
-                Expr::Literal(1.0),
-                Expr::Literal(9.0),
-                Expr::Function(POW),
-                Expr::Function(ADD),
                 Expr::Function(ADD),
             ])
         );

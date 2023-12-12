@@ -33,15 +33,20 @@ fn _run_with_spaces_2() {
 
 #[test]
 fn _a() {
-    _test_run("2 ^ 4 * 5 + 6 + 1 ^ 9", 2f64.powf(4.) * 5. + 6. + 1f64.powf(9.))
+    _test_run(
+        "2 ^ 4 * 5 + 6 + 1 ^ 9",
+        2f64.powf(4.) * 5. + 6. + 1f64.powf(9.),
+    )
+}
+
+#[test]
+fn _cos_2pi() {
+    _test_run("cos 2pi", 1.)
 }
 
 #[test]
 fn _run_with_spaces_3() {
-    _test_run(
-        "234 *5+7*8-18 ^ 3",
-        234. * (5. + 7. * 8. - 18f64).powf(3.),
-    );
+    _test_run("234 *5+7*8-18 ^ 3", 234. * (5. + 7. * 8. - 18f64).powf(3.));
 }
 
 #[test]
@@ -71,16 +76,29 @@ fn _spaces_brackets_and_negations() {
 }
 
 #[test]
+fn _unary_ordering() {
+    _test_run("cos2pi   ", (2. * std::f64::consts::PI).cos());
+    _test_run("cos 2pi  ", (2. * std::f64::consts::PI).cos());
+    _test_run("cos2 pi  ", 2f64.cos() * std::f64::consts::PI);
+    _test_run("cos 2 pi ", (2. * std::f64::consts::PI).cos());
+}
+
+#[test]
 fn _double_unary() {
-    _test_run("cos cos 0", (1 as f64).cos());
-    _test_run("cos(cos 0)", (1 as f64).cos());
-    _test_run("cos(cos(0))", (1 as f64).cos());
+    dbg!(1);
+    _test_run("cos cos 2-2", (1 as f64).cos());
+    dbg!(2);
+    _test_run("cos(cos 2-2)", (1 as f64).cos());
+    dbg!(3);
+    _test_run("cos(cos(2-2))", (1 as f64).cos());
+    dbg!(4);
     assert_eq!(
-        1. - run("acos(cos(1))", &Env::std()).unwrap() < std::f64::EPSILON,
+        1. - run("acos(cos(3-2))", &Env::std()).unwrap() < std::f64::EPSILON,
         true
     );
+    dbg!(5);
     assert_eq!(
-        1. - run("acosh cosh(1)", &Env::std()).unwrap() < std::f64::EPSILON,
+        1. - run("acosh cosh(3-2)", &Env::std()).unwrap() < std::f64::EPSILON,
         true
     );
 }

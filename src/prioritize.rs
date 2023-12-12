@@ -35,9 +35,10 @@ pub fn prioritize(tokens: Vec<Token>, env: &crate::env::Env) -> Vec<Expr> {
                             if let Some(llast) = stack.last() {
                                 match llast {
                                     // '8 -2'
-                                    Some(Expr::Literal(_)) => {
+                                    Some(Expr::Literal(m)) => {
+                                        let op = if n < 0. { ADD } else { MUL };
                                         stack.push(Some(Expr::Function(
-                                            adjust(ADD, balance).prioritize(-PRIORITY_SPACE),
+                                            adjust(op, balance).prioritize(-PRIORITY_SPACE),
                                         )));
                                         stack.push(Some(Expr::Literal(n)))
                                     }
@@ -60,7 +61,28 @@ pub fn prioritize(tokens: Vec<Token>, env: &crate::env::Env) -> Vec<Expr> {
                 }
             }
             TokenType::Identifier => match env.expr(tok.lexeme) {
-                expr @ (Expr::Function(_) | Expr::Literal(_)) => stack.push(Some(expr)),
+                expr @ (Expr::Function(_) | Expr::Literal(_)) => {
+                    match stack.last() {
+                        Some(Some(Expr::Literal(_))) => {
+                            stack.push(Some(Expr::Function(
+                                adjust(MUL, balance),
+                            )));
+                        }
+                        Some(None) => {
+                            stack.pop().unwrap();
+                            match stack.last() {
+                                Some(Some(Expr::Literal(_))) => {
+                                    stack.push(Some(Expr::Function(
+                                        adjust(MUL, balance).prioritize(-PRIORITY_SPACE),
+                                    )));
+                                }
+                                _ => {}
+                            }
+                        }
+                        _ => {}
+                    }
+                    stack.push(Some(expr));
+                }
                 _ => stack.push(Some(Expr::Error(tok.lexeme.to_owned()))),
             },
             TokenType::Symbol => {
@@ -104,7 +126,7 @@ pub fn prioritize(tokens: Vec<Token>, env: &crate::env::Env) -> Vec<Expr> {
             }
             TokenType::Space => {
                 if let Some(Some(Expr::Function(bin))) = stack.last_mut() {
-                    if bin.arity == 2 && !bin.was_spaced() {
+                    if bin.arity <= 2 && !bin.was_spaced() {
                         bin.prioritize(-PRIORITY_SPACE);
                     } else {
                         stack.push(None);
