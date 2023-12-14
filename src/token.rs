@@ -23,10 +23,7 @@ pub struct Token<'t> {
 
 impl<'t> Token<'t> {
     pub fn new(ttype: TokenType, lexeme: &'t str) -> Self {
-        Self {
-            ttype: ttype,
-            lexeme: lexeme,
-        }
+        Self { ttype, lexeme }
     }
 
     pub fn lit(lit: f64, lexeme: &'t str) -> Self {

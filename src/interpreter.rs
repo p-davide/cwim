@@ -76,7 +76,7 @@ fn eval(shunted: Vec<Expr>, env: &mut crate::env::Env) -> Parsed<f64> {
                         Some(n) => {
                             if fun == ASSIGN {
                                 env.assign(
-                                    initializee.clone().unwrap(),
+                                    initializee.unwrap(),
                                     crate::env::Variable::Value(n),
                                 );
                                 return Ok(n);
@@ -193,6 +193,7 @@ mod test {
 
     // " -(6) * -(6)"
     #[test]
+    #[allow(const_item_mutation)]
     fn _shuntingyard_4() {
         assert_eq!(
             shuntingyard(vec![
@@ -225,6 +226,7 @@ mod test {
 
     // " -(6) * -(6)"
     #[test]
+    #[allow(const_item_mutation)]
     fn _eval_2() {
         assert_eq!(
             eval(

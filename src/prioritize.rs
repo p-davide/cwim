@@ -68,13 +68,10 @@ pub fn prioritize(tokens: Vec<Token>, env: &crate::env::Env) -> Vec<Expr> {
                         }
                         Some(None) => {
                             stack.pop().unwrap();
-                            match stack.last() {
-                                Some(Some(Expr::Literal(_))) => {
-                                    stack.push(Some(Expr::Function(
-                                        adjust(MUL, balance).prioritize(-PRIORITY_SPACE),
-                                    )));
-                                }
-                                _ => {}
+                            if let Some(Some(Expr::Literal(_))) = stack.last() {
+                                stack.push(Some(Expr::Function(
+                                    adjust(MUL, balance).prioritize(-PRIORITY_SPACE),
+                                )));
                             }
                         }
                         _ => {}
@@ -144,10 +141,9 @@ pub fn prioritize(tokens: Vec<Token>, env: &crate::env::Env) -> Vec<Expr> {
         }
     }
     let mut result = vec![];
-    for space_or_expr in stack {
-        if let Some(expr) = space_or_expr {
-            result.push(expr);
-        }
+    // Remove any leftover `None`s (spaces)
+    for expr in stack.into_iter().flatten() {
+        result.push(expr);
     }
     result
 }
@@ -167,6 +163,7 @@ mod test {
     }
 
     #[test]
+    #[allow(const_item_mutation)]
     fn _with_spaces() {
         let it = [
             Token::lit(8., "8."),
@@ -187,6 +184,7 @@ mod test {
 
     // (5+ -6)-7
     #[test]
+    #[allow(const_item_mutation)]
     fn _parens_and_spaces() {
         let it = [
             Token::lparen(),
@@ -211,6 +209,7 @@ mod test {
 
     // -(5+ -6)-7
     #[test]
+    #[allow(const_item_mutation)]
     fn _neg_parens_and_spaces() {
         let it = [
             Token::sym("-"),
@@ -237,6 +236,7 @@ mod test {
 
     // " -(6) * -(6)"
     #[test]
+    #[allow(const_item_mutation)]
     fn _nsix() {
         assert_eq!(
             prioritize(

@@ -5,7 +5,7 @@ pub type Parsed<T> = Result<T, String>;
 pub fn parse(text: &str) -> Parsed<Vec<Token>> {
     let mut to_parse = text;
     let mut tokens = vec![];
-    while to_parse.len() != 0 {
+    while !to_parse.is_empty() {
         let token = parse_token(to_parse)?;
         if token.ttype == TokenType::Error {
             return Err(token.lexeme.to_owned());
@@ -17,7 +17,7 @@ pub fn parse(text: &str) -> Parsed<Vec<Token>> {
 }
 
 fn parse_token(text: &str) -> Parsed<Token> {
-    let c = text.chars().nth(0).ok_or("Tried to parse empty token")?;
+    let c = text.chars().next().ok_or("Tried to parse empty token")?;
     if c.is_ascii_digit() {
         return parse_number(text);
     }
@@ -48,7 +48,7 @@ fn parse_token(text: &str) -> Parsed<Token> {
 pub const SYMBOLS: &str = "!@$%^&*|\"';,./+-=";
 
 fn parse_char(expected: char, ttype: TokenType, text: &str) -> Parsed<Token> {
-    let actual = text.chars().nth(0).ok_or("Tried to parse empty token")?;
+    let actual = text.chars().next().ok_or("Tried to parse empty token")?;
     if expected == actual {
         Ok(Token::new(ttype, &text[..1]))
     } else {
@@ -111,7 +111,7 @@ fn parse_number(text: &str) -> Parsed<Token> {
         return Err("minus sign not part of negative number".to_owned());
     }
     let parsed = lexeme.parse::<f64>();
-    if let Err(_) = parsed {
+    if parsed.is_err() {
         return Err(format!("failed to parse '{}'", lexeme));
     }
     if l == 0 {
@@ -137,8 +137,8 @@ fn parse_identifier(text: &str) -> Parsed<Token> {
     }
 }
 
-fn parse_symbol<'a>(text: &'a str) -> Parsed<Token<'a>> {
-    let actual = text.chars().nth(0).ok_or("there should be a char here")?;
+fn parse_symbol(text: &str) -> Parsed<Token> {
+    let actual = text.chars().next().ok_or("there should be a char here")?;
     if SYMBOLS.contains(actual) {
         Ok(Token::sym(&text[..1]))
     } else {
