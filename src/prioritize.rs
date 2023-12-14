@@ -81,7 +81,7 @@ pub fn prioritize(tokens: Vec<Token>, env: &crate::env::Env) -> Vec<Expr> {
                     }
                     stack.push(Some(expr));
                 }
-                _ => stack.push(Some(Expr::Error(format!("Can't find {}", tok.lexeme)))),
+                _ => stack.push(Some(Expr::Variable(tok.lexeme.to_owned()))),
             },
             TokenType::Symbol => {
                 let expr = env.expr(tok.lexeme);
@@ -120,7 +120,10 @@ pub fn prioritize(tokens: Vec<Token>, env: &crate::env::Env) -> Vec<Expr> {
                         _ => stack.push(Some(Expr::Function(bin))),
                     }
                 } else {
-                    stack.push(Some(Expr::Error(format!("no function named '{}'", tok.lexeme))));
+                    stack.push(Some(Expr::Error(format!(
+                        "no function named '{}'",
+                        tok.lexeme
+                    ))));
                 };
             }
             TokenType::Space => {

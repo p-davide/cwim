@@ -1,7 +1,7 @@
 use cwim::env::*;
 use cwim::interpreter::run;
 fn _test_run(text: &str, expected: f64) {
-    assert_eq!(run(text, &Env::std()), Ok(expected));
+    assert_eq!(run(text, &mut Env::std()), Ok(expected));
 }
 
 #[test]
@@ -67,7 +67,7 @@ fn _run_with_parens_3() {
 
 #[test]
 fn _unmatched_parens() {
-    assert_eq!(run("4)", &Env::std()), Err("unmatched )".to_owned()));
+    assert_eq!(run("4)", &mut Env::std()), Err("unmatched )".to_owned()));
 }
 
 #[test]
@@ -93,12 +93,20 @@ fn _double_unary() {
     _test_run("cos(cos(2-2))", (1 as f64).cos());
     dbg!(4);
     assert_eq!(
-        1. - run("acos(cos(3-2))", &Env::std()).unwrap() < std::f64::EPSILON,
+        1. - run("acos(cos(3-2))", &mut Env::std()).unwrap() < std::f64::EPSILON,
         true
     );
     dbg!(5);
     assert_eq!(
-        1. - run("acosh cosh(3-2)", &Env::std()).unwrap() < std::f64::EPSILON,
+        1. - run("acosh cosh(3-2)", &mut Env::std()).unwrap() < std::f64::EPSILON,
         true
     );
+}
+
+// TODO: Test assignments more.
+#[test]
+fn _assignment() {
+    let mut env = Env::std();
+    run("x = 6", &mut env).unwrap();
+    assert_eq!(env.expr("x"), cwim::interpreter::Expr::Literal(6.));
 }

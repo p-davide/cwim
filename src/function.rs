@@ -194,6 +194,13 @@ pub const POW: Function = Function {
     precedence: PRIORITY_SPACE + 6,
 };
 
+pub const ASSIGN: Function = Function {
+    name: "=",
+    arity: 2,
+    f: |xs| xs[0],
+    precedence: PRIORITY_SPACE,
+};
+
 #[cfg(test)]
 mod test {
     use super::*;

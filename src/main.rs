@@ -1,10 +1,15 @@
+use cwim::env::*;
 use cwim::interpreter::*;
 use inquire::Text;
 
 fn main() {
+    let mut env = Env::std();
     while let Ok(line) = Text::new("").prompt() {
-        match run(&line, &cwim::env::Env::std()) {
-            Ok(result) => println!("{}", result),
+        match run(&line, &mut env) {
+            Ok(result) => {
+                println!("{}", result);
+                env.assign("ans".to_owned(), Variable::Value(result));
+            }
             Err(msg) => eprintln!("{}", msg),
         }
     }

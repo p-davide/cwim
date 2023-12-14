@@ -45,7 +45,7 @@ fn parse_token(text: &str) -> Parsed<Token> {
     }
 }
 
-pub const SYMBOLS: &str = "!@$%^&*|\"';,./+-";
+pub const SYMBOLS: &str = "!@$%^&*|\"';,./+-=";
 
 fn parse_char(expected: char, ttype: TokenType, text: &str) -> Parsed<Token> {
     let actual = text.chars().nth(0).ok_or("Tried to parse empty token")?;
@@ -89,14 +89,7 @@ fn parse_rparen(text: &str) -> Parsed<Token> {
 }
 
 fn parse_comment(text: &str) -> Parsed<Token> {
-    let mut l: usize = 0;
-    for c in text.chars() {
-        if c == '\n' {
-            return Ok(Token::new(TokenType::Comment, &text[..l]));
-        } else {
-            l = l + 1;
-        }
-    }
+    let l = text.chars().take_while(|c| *c != '\n').count();
     if l == 0 {
         Err("empty comment".to_owned())
     } else {

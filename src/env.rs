@@ -1,48 +1,50 @@
 use crate::function::*;
 use crate::interpreter::Expr;
 
+#[derive(Debug)]
 pub enum Variable {
     Function(Function),
     Value(f64),
 }
 
-pub struct Env<'e> {
-    inner: std::collections::HashMap<&'e str, Variable>,
+pub struct Env {
+    inner: std::collections::HashMap<String, Variable>,
 }
 
-impl<'e> Env<'e> {
+impl Env {
     pub fn std() -> Self {
         Self {
             inner: std::collections::HashMap::from([
-                ("+", Variable::Function(ADD)),
-                ("-", Variable::Function(SUB)),
-                ("*", Variable::Function(MUL)),
-                ("/", Variable::Function(DIV)),
-                ("^", Variable::Function(POW)),
-                ("sqrt", Variable::Function(SQRT)),
-                ("cbrt", Variable::Function(CBRT)),
-                ("pi", Variable::Value(std::f64::consts::PI)),
-                ("cos", Variable::Function(COS)),
-                ("sin", Variable::Function(SIN)),
-                ("tan", Variable::Function(TAN)),
-                ("exp", Variable::Function(EXP)),
-                ("ln", Variable::Function(LN)),
-                ("log2", Variable::Function(LOG2)),
-                ("acos", Variable::Function(ACOS)),
-                ("asin", Variable::Function(ASIN)),
-                ("atan", Variable::Function(ATAN)),
-                ("arccos", Variable::Function(ACOS)),
-                ("arcsin", Variable::Function(ASIN)),
-                ("arctan", Variable::Function(ATAN)),
-                ("cosh", Variable::Function(COSH)),
-                ("sinh", Variable::Function(SINH)),
-                ("tanh", Variable::Function(TANH)),
-                ("acosh", Variable::Function(ACOSH)),
-                ("asinh", Variable::Function(ASINH)),
-                ("atanh", Variable::Function(ATANH)),
-                ("arccosh", Variable::Function(ACOSH)),
-                ("arcsinh", Variable::Function(ASINH)),
-                ("arctanh", Variable::Function(ATANH)),
+                ("=".to_owned(), Variable::Function(ASSIGN)),
+                ("+".to_owned(), Variable::Function(ADD)),
+                ("-".to_owned(), Variable::Function(SUB)),
+                ("*".to_owned(), Variable::Function(MUL)),
+                ("/".to_owned(), Variable::Function(DIV)),
+                ("^".to_owned(), Variable::Function(POW)),
+                ("sqrt".to_owned(), Variable::Function(SQRT)),
+                ("cbrt".to_owned(), Variable::Function(CBRT)),
+                ("pi".to_owned(), Variable::Value(std::f64::consts::PI)),
+                ("cos".to_owned(), Variable::Function(COS)),
+                ("sin".to_owned(), Variable::Function(SIN)),
+                ("tan".to_owned(), Variable::Function(TAN)),
+                ("exp".to_owned(), Variable::Function(EXP)),
+                ("ln".to_owned(), Variable::Function(LN)),
+                ("log2".to_owned(), Variable::Function(LOG2)),
+                ("acos".to_owned(), Variable::Function(ACOS)),
+                ("asin".to_owned(), Variable::Function(ASIN)),
+                ("atan".to_owned(), Variable::Function(ATAN)),
+                ("arccos".to_owned(), Variable::Function(ACOS)),
+                ("arcsin".to_owned(), Variable::Function(ASIN)),
+                ("arctan".to_owned(), Variable::Function(ATAN)),
+                ("cosh".to_owned(), Variable::Function(COSH)),
+                ("sinh".to_owned(), Variable::Function(SINH)),
+                ("tanh".to_owned(), Variable::Function(TANH)),
+                ("acosh".to_owned(), Variable::Function(ACOSH)),
+                ("asinh".to_owned(), Variable::Function(ASINH)),
+                ("atanh".to_owned(), Variable::Function(ATANH)),
+                ("arccosh".to_owned(), Variable::Function(ACOSH)),
+                ("arcsinh".to_owned(), Variable::Function(ASINH)),
+                ("arctanh".to_owned(), Variable::Function(ATANH)),
             ]),
         }
     }
@@ -54,5 +56,9 @@ impl<'e> Env<'e> {
             Some(Variable::Value(n)) => Expr::Literal(*n),
             None => Expr::Error(format!("Can't find '{}'", l)),
         }
+    }
+
+    pub fn assign(&mut self, lhs: String, rhs: Variable) -> Option<Variable> {
+        self.inner.insert(lhs, rhs)
     }
 }

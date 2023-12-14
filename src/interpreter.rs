@@ -28,7 +28,7 @@ fn shuntingyard(exprs: Vec<Expr>) -> Parsed<Vec<Expr>> {
     let mut ops: Vec<Function> = vec![];
     for expr in exprs {
         match expr {
-            Expr::Literal(_) => result.push(expr),
+            Expr::Literal(_) | Expr::Variable(_) => result.push(expr),
             Expr::Function(b) => {
                 while let Some(op) = ops.last() {
                     // NOTE: This assumes:
@@ -45,7 +45,6 @@ fn shuntingyard(exprs: Vec<Expr>) -> Parsed<Vec<Expr>> {
                 ops.push(b)
             }
             Expr::Error(msg) => return Err(msg),
-            other => unimplemented!("{:?}", other),
         }
     }
     while let Some(op) = ops.pop() {
@@ -54,8 +53,19 @@ fn shuntingyard(exprs: Vec<Expr>) -> Parsed<Vec<Expr>> {
     Ok(result)
 }
 
-fn eval(shunted: Vec<Expr>) -> Parsed<f64> {
+fn eval(shunted: Vec<Expr>, env: &mut crate::env::Env) -> Parsed<f64> {
+    if shunted
+        .iter()
+        .rev()
+        .skip(1)
+        .any(|it| *it == Expr::Function(ASSIGN))
+    {
+        return Err(
+            "There must be only one assignment, and its result can't be used as a value".to_owned(),
+        );
+    }
     let mut stack = vec![];
+    let mut initializee: Option<String> = None;
     for expr in shunted {
         match expr {
             Expr::Literal(n) => stack.push(n),
@@ -63,7 +73,17 @@ fn eval(shunted: Vec<Expr>) -> Parsed<f64> {
                 let mut xs = vec![];
                 for i in 0..fun.arity {
                     match stack.pop() {
-                        Some(n) => xs.push(n),
+                        Some(n) => {
+                            if fun == ASSIGN {
+                                env.assign(
+                                    initializee.clone().unwrap(),
+                                    crate::env::Variable::Value(n),
+                                );
+                                return Ok(n);
+                            } else {
+                                xs.push(n)
+                            }
+                        }
                         None => {
                             return Err(format!(
                                 "expected {} arguments to {}, found {}",
@@ -75,52 +95,60 @@ fn eval(shunted: Vec<Expr>) -> Parsed<f64> {
                 let f = fun.f;
                 stack.push(f(xs));
             }
-            _ => unimplemented!(),
+            Expr::Variable(var) => initializee = Some(var),
+            Expr::Error(msg) => return Err(msg),
         }
     }
     stack.pop().ok_or("empty stack".to_owned())
 }
 
-pub fn run(text: &str, env: &crate::env::Env) -> Parsed<f64> {
+pub fn run(text: &str, env: &mut crate::env::Env) -> Parsed<f64> {
     let tks = parse(text)?;
     let parens = prioritize(tks, env);
     let s = shuntingyard(parens)?;
-    eval(s)
+    eval(s, env)
 }
 
 #[cfg(test)]
 mod test {
     use super::*;
+    use crate::env::*;
 
     #[test]
     fn _eval_3() {
         assert_eq!(
-            eval(vec![
-                Expr::Literal(2.),
-                Expr::Literal(4.),
-                Expr::Function(POW),
-                Expr::Literal(5.),
-                Expr::Function(MUL),
-                Expr::Literal(6.),
-                Expr::Literal(1.),
-                Expr::Literal(9.),
-                Expr::Function(POW),
-                Expr::Function(ADD),
-                Expr::Function(ADD),
-            ]),
-            eval(vec![
-                Expr::Literal(2.),
-                Expr::Literal(4.),
-                Expr::Function(POW),
-                Expr::Literal(5.),
-                Expr::Function(MUL),
-                Expr::Literal(6.),
-                Expr::Function(ADD),
-                Expr::Literal(1.),
-                Expr::Literal(9.),
-                Expr::Function(POW),
-                Expr::Function(ADD),
-            ])
+            eval(
+                vec![
+                    Expr::Literal(2.),
+                    Expr::Literal(4.),
+                    Expr::Function(POW),
+                    Expr::Literal(5.),
+                    Expr::Function(MUL),
+                    Expr::Literal(6.),
+                    Expr::Literal(1.),
+                    Expr::Literal(9.),
+                    Expr::Function(POW),
+                    Expr::Function(ADD),
+                    Expr::Function(ADD),
+                ],
+                &mut Env::std()
+            ),
+            eval(
+                vec![
+                    Expr::Literal(2.),
+                    Expr::Literal(4.),
+                    Expr::Function(POW),
+                    Expr::Literal(5.),
+                    Expr::Function(MUL),
+                    Expr::Literal(6.),
+                    Expr::Function(ADD),
+                    Expr::Literal(1.),
+                    Expr::Literal(9.),
+                    Expr::Function(POW),
+                    Expr::Function(ADD),
+                ],
+                &mut Env::std()
+            )
         );
     }
     #[test]
@@ -187,11 +215,10 @@ mod test {
     #[test]
     fn _eval_1() {
         assert_eq!(
-            eval(vec![
-                Expr::Literal(2.),
-                Expr::Literal(5.),
-                Expr::Function(SUB),
-            ]),
+            eval(
+                vec![Expr::Literal(2.), Expr::Literal(5.), Expr::Function(SUB),],
+                &mut Env::std()
+            ),
             Ok(-3.)
         );
     }
@@ -200,13 +227,16 @@ mod test {
     #[test]
     fn _eval_2() {
         assert_eq!(
-            eval(vec![
-                Expr::Literal(6.),
-                Expr::Function(NEG),
-                Expr::Literal(6.),
-                Expr::Function(NEG),
-                Expr::Function(MUL.prioritize(-PRIORITY_SPACE)),
-            ]),
+            eval(
+                vec![
+                    Expr::Literal(6.),
+                    Expr::Function(NEG),
+                    Expr::Literal(6.),
+                    Expr::Function(NEG),
+                    Expr::Function(MUL.prioritize(-PRIORITY_SPACE)),
+                ],
+                &mut Env::std()
+            ),
             Ok(36.)
         );
     }
