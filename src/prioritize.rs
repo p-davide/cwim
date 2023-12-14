@@ -64,9 +64,7 @@ pub fn prioritize(tokens: Vec<Token>, env: &crate::env::Env) -> Vec<Expr> {
                 expr @ (Expr::Function(_) | Expr::Literal(_)) => {
                     match stack.last() {
                         Some(Some(Expr::Literal(_))) => {
-                            stack.push(Some(Expr::Function(
-                                adjust(MUL, balance),
-                            )));
+                            stack.push(Some(Expr::Function(adjust(MUL, balance))));
                         }
                         Some(None) => {
                             stack.pop().unwrap();
@@ -87,42 +85,43 @@ pub fn prioritize(tokens: Vec<Token>, env: &crate::env::Env) -> Vec<Expr> {
             },
             TokenType::Symbol => {
                 let expr = env.expr(tok.lexeme);
-                let mut bin = if let Expr::Function(f) = expr {
-                    adjust(f, balance)
-                } else {
-                    unimplemented!("no function named {} found", tok.lexeme)
-                };
-                match stack.last() {
-                    None => stack.push(Some(Expr::Function(
-                        NEG.clone().prioritize(PRIORITY_SPACE * balance),
-                    ))),
-                    Some(None) => {
-                        bin.precedence -= PRIORITY_SPACE;
-                        stack.pop().expect("result.last() was checked?");
-                        if tok.lexeme == "-" {
-                            match stack.last() {
-                                None | Some(Some(Expr::Function(_))) => {
-                                    stack.push(Some(Expr::Function(
-                                        NEG.clone().prioritize(PRIORITY_SPACE * balance),
-                                    )))
+                if let Expr::Function(f) = expr {
+                    let mut bin = adjust(f, balance);
+
+                    match stack.last() {
+                        None => stack.push(Some(Expr::Function(
+                            NEG.clone().prioritize(PRIORITY_SPACE * balance),
+                        ))),
+                        Some(None) => {
+                            bin.precedence -= PRIORITY_SPACE;
+                            stack.pop().expect("result.last() was checked?");
+                            if tok.lexeme == "-" {
+                                match stack.last() {
+                                    None | Some(Some(Expr::Function(_))) => {
+                                        stack.push(Some(Expr::Function(
+                                            NEG.clone().prioritize(PRIORITY_SPACE * balance),
+                                        )))
+                                    }
+                                    Some(None) => unreachable!("two space tokens in a row"),
+                                    _ => stack.push(Some(Expr::Function(bin))),
                                 }
-                                Some(None) => unreachable!("two space tokens in a row"),
-                                _ => stack.push(Some(Expr::Function(bin))),
+                            } else {
+                                stack.push(Some(Expr::Function(bin)));
                             }
-                        } else {
-                            stack.push(Some(Expr::Function(bin)));
                         }
-                    }
-                    // Transform SUB into NEG
-                    Some(Some(Expr::Function(_))) => {
-                        if tok.lexeme == "-" {
-                            stack.push(Some(Expr::Function(
-                                NEG.clone().prioritize(PRIORITY_SPACE * balance),
-                            )));
+                        // Transform SUB into NEG
+                        Some(Some(Expr::Function(_))) => {
+                            if tok.lexeme == "-" {
+                                stack.push(Some(Expr::Function(
+                                    NEG.clone().prioritize(PRIORITY_SPACE * balance),
+                                )));
+                            }
                         }
+                        _ => stack.push(Some(Expr::Function(bin))),
                     }
-                    _ => stack.push(Some(Expr::Function(bin))),
-                }
+                } else {
+                    stack.push(Some(Expr::Error(format!("no function named '{}'", tok.lexeme))));
+                };
             }
             TokenType::Space => {
                 if let Some(Some(Expr::Function(bin))) = stack.last_mut() {
