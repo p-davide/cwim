@@ -21,6 +21,7 @@ impl Env {
                 ("*".to_owned(), Variable::Function(MUL)),
                 ("/".to_owned(), Variable::Function(DIV)),
                 ("^".to_owned(), Variable::Function(POW)),
+                ("%".to_owned(), Variable::Function(REM)),
                 ("sqrt".to_owned(), Variable::Function(SQRT)),
                 ("cbrt".to_owned(), Variable::Function(CBRT)),
                 ("pi".to_owned(), Variable::Value(std::f64::consts::PI)),

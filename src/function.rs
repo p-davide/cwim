@@ -186,6 +186,16 @@ pub const DIV: Function = Function {
     f: |xs| xs[1] / xs[0],
     precedence: PRIORITY_SPACE + 5,
 };
+
+// https://en.wikipedia.org/wiki/Modulo#Variants_of_the_definition
+// Truncated
+pub const REM: Function = Function {
+    name: "%",
+    arity: 2,
+    f: |xs| xs[1] % xs[0],
+    precedence: PRIORITY_SPACE + 5,
+};
+
 // TODO: Make right-associative
 pub const POW: Function = Function {
     name: "^",
