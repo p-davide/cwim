@@ -12,9 +12,26 @@ pub fn prioritize(tokens: Vec<Token>, env: &crate::env::Env) -> Vec<Expr> {
     fn adjust(mut f: Function, balance: i32) -> Function {
         f.prioritize(PRIORITY_SPACE * balance)
     }
+
     for tok in tokens {
         match tok.ttype {
-            TokenType::LParen => balance += 2,
+            TokenType::LParen => {
+                // 2(3+5) -> 2*(3+5)
+                let (spaces, last) = if let Some(None) = stack.last() {
+                    stack.pop().unwrap();
+                    (1, stack.last())
+                } else {
+                    (0, stack.last())
+                };
+
+                if let Some(Some(Expr::Literal(_))) = last {
+                    stack.push(Some(Expr::Function(
+                        adjust(MUL, balance).prioritize(-PRIORITY_SPACE * spaces),
+                    )));
+                }
+
+                balance += 2
+            }
             TokenType::RParen => {
                 balance -= 2;
                 if balance < -1 {
@@ -32,49 +49,38 @@ pub fn prioritize(tokens: Vec<Token>, env: &crate::env::Env) -> Vec<Expr> {
                         // ' -2'
                         None => {
                             stack.pop().unwrap();
-                            if let Some(llast) = stack.last() {
-                                match llast {
-                                    // '8 -2'
-                                    Some(Expr::Literal(_)) => {
-                                        let op = if n < 0. { ADD } else { MUL };
-                                        stack.push(Some(Expr::Function(
-                                            adjust(op, balance).prioritize(-PRIORITY_SPACE),
-                                        )));
-                                        stack.push(Some(Expr::Literal(n)))
-                                    }
-                                    // '5* -2', ' -2', ...
-                                    _ => stack.push(Some(Expr::Literal(n))),
-                                }
+                            if let Some(Some(Expr::Literal(_))) = stack.last() {
+                                // 5 -3 -> 5 - 3
+                                // 5 6 -> 5 * 6
+                                // TODO: 5 6 should be an error
+                                let op = if n < 0. { ADD } else { MUL };
+                                stack.push(Some(Expr::Function(
+                                    adjust(op, balance).prioritize(-PRIORITY_SPACE),
+                                )));
                             }
                         }
                         // '5-2'
                         Some(Expr::Literal(_)) => {
                             stack.push(Some(Expr::Function(adjust(ADD, balance))));
-                            stack.push(Some(Expr::Literal(n)));
                         }
-                        _ => {
-                            stack.push(Some(Expr::Literal(n)));
-                        }
+                        _ => {}
                     }
-                } else {
-                    stack.push(Some(Expr::Literal(n)));
                 }
+                stack.push(Some(Expr::Literal(n)));
             }
             TokenType::Identifier => match env.expr(tok.lexeme) {
                 expr @ (Expr::Function(_) | Expr::Literal(_)) => {
-                    match stack.last() {
-                        Some(Some(Expr::Literal(_))) => {
-                            stack.push(Some(Expr::Function(adjust(MUL, balance))));
-                        }
-                        Some(None) => {
-                            stack.pop().unwrap();
-                            if let Some(Some(Expr::Literal(_))) = stack.last() {
-                                stack.push(Some(Expr::Function(
-                                    adjust(MUL, balance).prioritize(-PRIORITY_SPACE),
-                                )));
-                            }
-                        }
-                        _ => {}
+                    let (spaces, last) = if let Some(None) = stack.last() {
+                        stack.pop().unwrap();
+                        (1, stack.last())
+                    } else {
+                        (0, stack.last())
+                    };
+
+                    if let Some(Some(Expr::Literal(_))) = last {
+                        stack.push(Some(Expr::Function(
+                            adjust(MUL, balance).prioritize(-PRIORITY_SPACE * spaces),
+                        )));
                     }
                     stack.push(Some(expr));
                 }

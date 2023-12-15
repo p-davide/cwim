@@ -58,11 +58,27 @@ fn _run_with_spaces_4() {
 }
 
 #[test]
+fn _implied_multiplication() {
+    _test_run("2(+3+5)", 16.);
+    _test_run("2 (+3+5)", 16.);
+}
+
+#[test]
 fn _run_with_parens_3() {
     _test_run(
         "234 *(5+7*8-18) ^ 3",
         234. * (5. + 7. * 8. - 18 as f64).powf(3.),
     );
+}
+
+#[test]
+fn _just_a_number() {
+    _test_run("3", 3.);
+    _test_run("(3)", 3.);
+    _test_run(" 3", 3.);
+    _test_run(" (3)", 3.);
+    _test_run(" 3 ", 3.);
+    _test_run(" (3 )", 3.);
 }
 
 #[test]
@@ -85,18 +101,13 @@ fn _unary_ordering() {
 
 #[test]
 fn _double_unary() {
-    dbg!(1);
     _test_run("cos cos 2-2", (1 as f64).cos());
-    dbg!(2);
     _test_run("cos(cos 2-2)", (1 as f64).cos());
-    dbg!(3);
     _test_run("cos(cos(2-2))", (1 as f64).cos());
-    dbg!(4);
     assert_eq!(
         1. - run("acos(cos(3-2))", &mut Env::std()).unwrap() < std::f64::EPSILON,
         true
     );
-    dbg!(5);
     assert_eq!(
         1. - run("acosh cosh(3-2)", &mut Env::std()).unwrap() < std::f64::EPSILON,
         true
