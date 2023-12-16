@@ -104,7 +104,7 @@ fn eval(shunted: Vec<Expr>, env: &mut crate::env::Env) -> Parsed<f64> {
 
 pub fn run(text: &str, env: &mut crate::env::Env) -> Parsed<f64> {
     let tks = parse(text)?;
-    let parens = prioritize(tks, env);
+    let parens = prioritize(tks, env)?;
     let s = shuntingyard(parens)?;
     eval(s, env)
 }

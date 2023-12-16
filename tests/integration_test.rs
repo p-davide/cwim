@@ -119,5 +119,5 @@ fn _double_unary() {
 fn _assignment() {
     let mut env = Env::std();
     run("x = 6", &mut env).unwrap();
-    assert_eq!(env.expr("x", Arity::Nullary), cwim::interpreter::Expr::Literal(6.));
+    assert_eq!(env.expr("x", Arity::Nullary), Ok(cwim::interpreter::Expr::Literal(6.)));
 }

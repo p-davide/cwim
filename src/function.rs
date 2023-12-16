@@ -159,6 +159,13 @@ pub const NEG: Function = Function {
     precedence: PRIORITY_SPACE + 2,
 };
 
+pub const ID: Function = Function {
+    name: "+",
+    arity: 1,
+    f: |x| x[0],
+    precedence: PRIORITY_SPACE + 2,
+};
+
 pub const ADD: Function = Function {
     name: "+",
     arity: 2,

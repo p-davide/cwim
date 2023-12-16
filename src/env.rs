@@ -1,5 +1,6 @@
 use crate::function::*;
 use crate::interpreter::Expr;
+use crate::parser::Parsed;
 
 #[derive(Debug)]
 pub enum Variable {
@@ -13,6 +14,7 @@ pub struct Functions {
     pub binary: Option<Function>,
 }
 
+#[derive(Debug)]
 pub enum Arity {
     Nullary,
     Unary,
@@ -54,7 +56,13 @@ impl Env {
         Self {
             inner: std::collections::HashMap::from([
                 binary("=", ASSIGN),
-                binary("+", ADD),
+                (
+                    "+".to_owned(),
+                    Variable::Function(Functions {
+                        unary: Some(ID),
+                        binary: Some(ADD),
+                    }),
+                ),
                 (
                     "-".to_owned(),
                     Variable::Function(Functions {
@@ -94,16 +102,22 @@ impl Env {
         }
     }
 
-    pub fn expr(&self, l: &str, arity: Arity) -> Expr {
+    pub fn expr(&self, l: &str, arity: Arity) -> Parsed<Expr> {
         let var = self.inner.get(l);
         match var {
-            Some(Variable::Function(f)) => Expr::Function(match arity {
-                Arity::Unary => f.unary.expect(l),
-                Arity::Binary => f.binary.expect(l),
-                Arity::Nullary => unreachable!(),
-            }),
-            Some(Variable::Value(n)) => Expr::Literal(*n),
-            None => Expr::Error(format!("Can't find '{}'", l)),
+            Some(Variable::Function(f)) => {
+                if let Some(it) = match arity {
+                    Arity::Unary => f.unary,
+                    Arity::Binary => f.binary,
+                    Arity::Nullary => None,
+                } {
+                    Ok(Expr::Function(it))
+                } else {
+                    Err(format!("unexpected {}", l))
+                }
+            }
+            Some(Variable::Value(n)) => Ok(Expr::Literal(*n)),
+            None => Err(format!("Can't find '{}'", l)),
         }
     }
 
