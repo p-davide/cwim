@@ -7,9 +7,6 @@ pub fn parse(text: &str) -> Parsed<Vec<Token>> {
     let mut tokens = vec![];
     while !to_parse.is_empty() {
         let token = parse_token(to_parse)?;
-        if token.ttype == TokenType::Error {
-            return Err(token.lexeme.to_owned());
-        }
         tokens.push(token);
         to_parse = &to_parse[token.lexeme.len()..];
     }
