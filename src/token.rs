@@ -34,17 +34,17 @@ impl<'t> Token<'t> {
     }
 
     #[cfg(test)]
-    pub fn space() -> Token<'static> {
-        Token::new(TokenType::Space, " ")
+    pub fn space() -> Self {
+        Self::new(TokenType::Space, " ")
     }
 
     #[cfg(test)]
-    pub fn lparen() -> Token<'static> {
-        Token::new(TokenType::LParen, "(")
+    pub fn lparen() -> Self {
+        Self::new(TokenType::LParen, "(")
     }
 
     #[cfg(test)]
-    pub fn rparen() -> Token<'static> {
-        Token::new(TokenType::RParen, ")")
+    pub fn rparen() -> Self {
+        Self::new(TokenType::RParen, ")")
     }
 }
