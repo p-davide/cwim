@@ -1,7 +1,7 @@
 use crate::function::*;
 use crate::interpreter::Expr;
 use crate::token::*;
-
+use crate::env::*;
 pub const PRIORITY_SPACE: i32 = 10;
 pub const PRIORITY_PAREN: i32 = 2 * PRIORITY_SPACE;
 
@@ -68,7 +68,7 @@ pub fn prioritize(tokens: Vec<Token>, env: &crate::env::Env) -> Vec<Expr> {
                 }
                 stack.push(Some(Expr::Literal(n)));
             }
-            TokenType::Identifier => match env.expr(tok.lexeme) {
+            TokenType::Identifier => match env.expr(tok.lexeme, Arity::Unary) {
                 expr @ (Expr::Function(_) | Expr::Literal(_)) => {
                     let (spaces, last) = if let Some(None) = stack.last() {
                         stack.pop().unwrap();
@@ -87,7 +87,7 @@ pub fn prioritize(tokens: Vec<Token>, env: &crate::env::Env) -> Vec<Expr> {
                 _ => stack.push(Some(Expr::Variable(tok.lexeme.to_owned()))),
             },
             TokenType::Symbol => {
-                let expr = env.expr(tok.lexeme);
+                let expr = env.expr(tok.lexeme, Arity::Binary);
                 if let Expr::Function(f) = expr {
                     let mut bin = adjust(f, balance);
 
@@ -157,7 +157,6 @@ pub fn prioritize(tokens: Vec<Token>, env: &crate::env::Env) -> Vec<Expr> {
 #[cfg(test)]
 mod test {
     use super::*;
-    use crate::env::*;
 
     #[test]
     fn _simple_priority() {

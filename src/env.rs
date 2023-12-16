@@ -3,57 +3,105 @@ use crate::interpreter::Expr;
 
 #[derive(Debug)]
 pub enum Variable {
-    Function(Function),
+    Function(Functions),
     Value(f64),
 }
 
+#[derive(Debug)]
+pub struct Functions {
+    pub unary: Option<Function>,
+    pub binary: Option<Function>,
+}
+
+pub enum Arity {
+    Nullary,
+    Unary,
+    Binary,
+}
+
+impl Functions {
+    fn unary(unary: Function) -> Self {
+        Self {
+            unary: Some(unary),
+            binary: None,
+        }
+    }
+    fn binary(binary: Function) -> Self {
+        Self {
+            binary: Some(binary),
+            unary: None,
+        }
+    }
+}
 pub struct Env {
     inner: std::collections::HashMap<String, Variable>,
+}
+
+fn binary(symbol: &'static str, f: Function) -> (String, Variable) {
+    (symbol.to_owned(), Variable::Function(Functions::binary(f)))
+}
+
+fn unary(symbol: &'static str, f: Function) -> (String, Variable) {
+    (symbol.to_owned(), Variable::Function(Functions::unary(f)))
+}
+
+fn value(symbol: &'static str, n: f64) -> (String, Variable) {
+    (symbol.to_owned(), Variable::Value(n))
 }
 
 impl Env {
     pub fn std() -> Self {
         Self {
             inner: std::collections::HashMap::from([
-                ("=".to_owned(), Variable::Function(ASSIGN)),
-                ("+".to_owned(), Variable::Function(ADD)),
-                ("-".to_owned(), Variable::Function(SUB)),
-                ("*".to_owned(), Variable::Function(MUL)),
-                ("/".to_owned(), Variable::Function(DIV)),
-                ("^".to_owned(), Variable::Function(POW)),
-                ("%".to_owned(), Variable::Function(REM)),
-                ("sqrt".to_owned(), Variable::Function(SQRT)),
-                ("cbrt".to_owned(), Variable::Function(CBRT)),
-                ("pi".to_owned(), Variable::Value(std::f64::consts::PI)),
-                ("cos".to_owned(), Variable::Function(COS)),
-                ("sin".to_owned(), Variable::Function(SIN)),
-                ("tan".to_owned(), Variable::Function(TAN)),
-                ("exp".to_owned(), Variable::Function(EXP)),
-                ("ln".to_owned(), Variable::Function(LN)),
-                ("log2".to_owned(), Variable::Function(LOG2)),
-                ("acos".to_owned(), Variable::Function(ACOS)),
-                ("asin".to_owned(), Variable::Function(ASIN)),
-                ("atan".to_owned(), Variable::Function(ATAN)),
-                ("arccos".to_owned(), Variable::Function(ACOS)),
-                ("arcsin".to_owned(), Variable::Function(ASIN)),
-                ("arctan".to_owned(), Variable::Function(ATAN)),
-                ("cosh".to_owned(), Variable::Function(COSH)),
-                ("sinh".to_owned(), Variable::Function(SINH)),
-                ("tanh".to_owned(), Variable::Function(TANH)),
-                ("acosh".to_owned(), Variable::Function(ACOSH)),
-                ("asinh".to_owned(), Variable::Function(ASINH)),
-                ("atanh".to_owned(), Variable::Function(ATANH)),
-                ("arccosh".to_owned(), Variable::Function(ACOSH)),
-                ("arcsinh".to_owned(), Variable::Function(ASINH)),
-                ("arctanh".to_owned(), Variable::Function(ATANH)),
+                binary("=", ASSIGN),
+                binary("+", ADD),
+                (
+                    "-".to_owned(),
+                    Variable::Function(Functions {
+                        unary: Some(NEG),
+                        binary: Some(SUB),
+                    }),
+                ),
+                binary("*", MUL),
+                binary("/", DIV),
+                binary("^", POW),
+                binary("%", REM),
+                unary("sqrt", SQRT),
+                unary("cbrt", CBRT),
+                value("pi", std::f64::consts::PI),
+                unary("cos", COS),
+                unary("sin", SIN),
+                unary("tan", TAN),
+                unary("exp", EXP),
+                unary("ln", LN),
+                unary("log2", LOG2),
+                unary("acos", ACOS),
+                unary("asin", ASIN),
+                unary("atan", ATAN),
+                unary("arccos", ACOS),
+                unary("arcsin", ASIN),
+                unary("arctan", ATAN),
+                unary("cosh", COSH),
+                unary("sinh", SINH),
+                unary("tanh", TANH),
+                unary("acosh", ACOSH),
+                unary("asinh", ASINH),
+                unary("atanh", ATANH),
+                unary("arccosh", ACOSH),
+                unary("arcsinh", ASINH),
+                unary("arctanh", ATANH),
             ]),
         }
     }
 
-    pub fn expr(&self, l: &str) -> Expr {
+    pub fn expr(&self, l: &str, arity: Arity) -> Expr {
         let var = self.inner.get(l);
         match var {
-            Some(Variable::Function(f)) => Expr::Function(*f),
+            Some(Variable::Function(f)) => Expr::Function(match arity {
+                Arity::Unary => f.unary.expect(l),
+                Arity::Binary => f.binary.expect(l),
+                Arity::Nullary => unreachable!(),
+            }),
             Some(Variable::Value(n)) => Expr::Literal(*n),
             None => Expr::Error(format!("Can't find '{}'", l)),
         }
