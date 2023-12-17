@@ -24,6 +24,12 @@ fn _minus() {
 }
 
 #[test]
+fn _plus_minus() {
+    _test_run("5-+5", 0.);
+    _test_run("5+-5", 0.);
+}
+
+#[test]
 fn _run_with_spaces_2() {
     _test_run(
         "234*5+7*8-18 ^ 3",
@@ -119,5 +125,5 @@ fn _double_unary() {
 fn _assignment() {
     let mut env = Env::std();
     run("x = 6", &mut env).unwrap();
-    assert_eq!(env.expr("x", Arity::Nullary), Ok(cwim::interpreter::Expr::Literal(6.)));
+    assert_eq!(env.find_value("x"), Ok(cwim::interpreter::Expr::Literal(6.)));
 }

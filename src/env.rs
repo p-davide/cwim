@@ -14,13 +14,6 @@ pub struct Functions {
     pub binary: Option<Function>,
 }
 
-#[derive(Debug)]
-pub enum Arity {
-    Nullary,
-    Unary,
-    Binary,
-}
-
 impl Functions {
     fn unary(unary: Function) -> Self {
         Self {
@@ -102,22 +95,36 @@ impl Env {
         }
     }
 
-    pub fn expr(&self, l: &str, arity: Arity) -> Parsed<Expr> {
+    pub fn find_value(&self, l: &str) -> Parsed<Expr> {
         let var = self.inner.get(l);
         match var {
-            Some(Variable::Function(f)) => {
-                if let Some(it) = match arity {
-                    Arity::Unary => f.unary,
-                    Arity::Binary => f.binary,
-                    Arity::Nullary => None,
-                } {
-                    Ok(Expr::Function(it))
-                } else {
-                    Err(format!("unexpected {}", l))
-                }
-            }
             Some(Variable::Value(n)) => Ok(Expr::Literal(*n)),
+            Some(Variable::Function(_)) => Err(format!("Expected value '{}', found function with that name.", l)),
             None => Err(format!("Can't find '{}'", l)),
+        }
+    }
+
+    pub fn find_unary(&self, l: &str) -> Parsed<Expr> {
+        let var = self.inner.get(l);
+        match var {
+            Some(Variable::Function(Functions {
+                binary: _,
+                unary: Some(unary),
+            })) => Ok(Expr::Function(*unary)),
+            Some(Variable::Value(n)) => Ok(Expr::Literal(*n)),
+            _ => Err(format!("Can't find '{}'", l)),
+        }
+    }
+
+    pub fn find_binary(&self, l: &str) -> Parsed<Expr> {
+        let var = self.inner.get(l);
+        match var {
+            Some(Variable::Function(Functions {
+                unary: _,
+                binary: Some(binary),
+            })) => Ok(Expr::Function(*binary)),
+            Some(Variable::Value(n)) => Ok(Expr::Literal(*n)),
+            _ => Err(format!("Can't find '{}'", l)),
         }
     }
 

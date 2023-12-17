@@ -1,4 +1,4 @@
-use crate::env::*;
+use crate::env::Env;
 use crate::function::*;
 use crate::interpreter::Expr;
 use crate::parser::Parsed;
@@ -7,149 +7,134 @@ use crate::token::*;
 pub const PRIORITY_SPACE: i32 = 10;
 pub const PRIORITY_PAREN: i32 = 2 * PRIORITY_SPACE;
 
+struct Exprs {
+    stack: Vec<Option<Expr>>,
+    balance: i32,
+}
+
+impl Exprs {
+    fn new() -> Self {
+        Self {
+            stack: vec![],
+            balance: 0,
+        }
+    }
+
+    fn trim_trailing_spaces(&mut self) -> (i32, Option<&Option<Expr>>) {
+        if let Some(None) = self.stack.last() {
+            self.stack.pop().unwrap();
+            (1, self.stack.last())
+        } else {
+            (0, self.stack.last())
+        }
+    }
+
+    fn imply(&mut self, f: Function, spaces: i32) {
+        self.stack.push(Some(Expr::Function(
+            f.clone()
+                .prioritize(PRIORITY_SPACE * (self.balance - spaces)),
+        )))
+    }
+
+    fn before_expr(&mut self) {
+        let (spaces, last) = self.trim_trailing_spaces();
+
+        if let Some(Some(Expr::Literal(_))) = last {
+            self.imply(MUL, spaces);
+        }
+    }
+
+    fn lparen(&mut self) {
+        self.before_expr();
+        self.balance += 2;
+    }
+
+    fn rparen(&mut self) -> Parsed<()> {
+        self.balance -= 2;
+        if self.balance < -1 {
+            return Err("unmatched )".to_owned());
+        }
+        // account for " )"
+        if self.balance % 2 == 1 {
+            self.balance += 1;
+        }
+        Ok(())
+    }
+
+    fn lit(&mut self, n: f64) -> Parsed<()> {
+        let (spaces, last) = self.trim_trailing_spaces();
+
+        if let Some(Some(Expr::Literal(m))) = last {
+            if spaces == 0 || n < 0. {
+                self.imply(ADD, spaces);
+            } else {
+                return Err(format!("No operation specified for {} and {}", m, n));
+            }
+        }
+        self.stack.push(Some(Expr::Literal(n)));
+        Ok(())
+    }
+
+    fn push(&mut self, var: Expr) {
+        self.stack.push(Some(var))
+    }
+
+    fn space(&mut self) {
+        match self.stack.last_mut() {
+            Some(Some(Expr::Function(bin))) if bin.arity <= 2 && !bin.was_spaced() => {
+                bin.prioritize(-PRIORITY_SPACE);
+            }
+            _ => {
+                self.stack.push(None);
+            }
+        }
+    }
+
+    fn operator(&mut self, env: &Env, lexeme: &str) -> Parsed<()> {
+        if let Expr::Function(binary) = env.find_binary(lexeme)? {
+            let (spaces, last) = self.trim_trailing_spaces();
+            let f = if let Ok(Expr::Function(unary)) = env.find_unary(lexeme) {
+                match last {
+                    None | Some(Some(Expr::Function(_))) => unary,
+                    _ => binary,
+                }
+            } else {
+                binary
+            };
+            self.imply(f, spaces);
+            Ok(())
+        } else {
+            Err(format!("no function named '{}'", lexeme))
+        }
+    }
+}
 pub fn prioritize(tokens: Vec<Token>, env: &crate::env::Env) -> Parsed<Vec<Expr>> {
     // Inside `stack`, `None` indicates a space.
-    let mut stack: Vec<Option<Expr>> = vec![];
-    let mut balance = 0;
-    fn adjust(mut f: Function, balance: i32) -> Function {
-        f.prioritize(PRIORITY_SPACE * balance)
-    }
+    let mut exprs = Exprs::new();
 
     for tok in tokens {
         match tok.ttype {
             TokenType::LParen => {
-                // 2(3+5) -> 2*(3+5)
-                let (spaces, last) = if let Some(None) = stack.last() {
-                    stack.pop().unwrap();
-                    (1, stack.last())
-                } else {
-                    (0, stack.last())
-                };
-
-                if let Some(Some(Expr::Literal(_))) = last {
-                    stack.push(Some(Expr::Function(
-                        adjust(MUL, balance).prioritize(-PRIORITY_SPACE * spaces),
-                    )));
-                }
-
-                balance += 2
+                exprs.lparen();
             }
             TokenType::RParen => {
-                balance -= 2;
-                if balance < -1 {
-                    stack.push(Some(Expr::Error("unmatched )".to_owned())));
-                }
-                // account for " )"
-                if balance % 2 == 1 {
-                    balance += 1;
-                }
+                exprs.rparen()?;
             }
             TokenType::Literal(n) => {
-                if let Some(last) = stack.last() {
-                    // let n = -2
-                    match last {
-                        // ' -2'
-                        None => {
-                            stack.pop().unwrap();
-                            if let Some(Some(Expr::Literal(m))) = stack.last() {
-                                // 5 -3 -> 5 - 3
-                                // 5 6 -> 5 * 6
-                                if n < 0. {
-                                    stack.push(Some(Expr::Function(
-                                        adjust(ADD, balance).prioritize(-PRIORITY_SPACE),
-                                    )))
-                                } else {
-                                    return Err(format!(
-                                        "No operation specified for {} and {}",
-                                        m, n
-                                    ));
-                                }
-                            }
-                        }
-                        // '5-2'
-                        Some(Expr::Literal(_)) => {
-                            stack.push(Some(Expr::Function(adjust(ADD, balance))));
-                        }
-                        _ => {}
-                    }
-                }
-                stack.push(Some(Expr::Literal(n)));
+                exprs.lit(n)?;
             }
-            TokenType::Identifier => match env.expr(tok.lexeme, Arity::Unary) {
-                expr @ (Ok(Expr::Function(_)) | Ok(Expr::Literal(_))) => {
-                    let (spaces, last) = if let Some(None) = stack.last() {
-                        stack.pop().unwrap();
-                        (1, stack.last())
-                    } else {
-                        (0, stack.last())
-                    };
-
-                    if let Some(Some(Expr::Literal(_))) = last {
-                        stack.push(Some(Expr::Function(
-                            adjust(MUL, balance).prioritize(-PRIORITY_SPACE * spaces),
-                        )));
-                    }
-                    stack.push(Some(expr.unwrap()));
+            TokenType::Identifier => match env.find_unary(tok.lexeme) {
+                Ok(expr @ Expr::Function(_) | expr @ Expr::Literal(_)) => {
+                    exprs.before_expr();
+                    exprs.push(expr);
                 }
-                _ => stack.push(Some(Expr::Variable(tok.lexeme.to_owned()))),
+                _ => exprs.push(Expr::Variable(tok.lexeme.to_owned())),
             },
             TokenType::Symbol => {
-                let expr = env.expr(tok.lexeme, Arity::Binary);
-                if let Ok(Expr::Function(f)) = expr {
-                    let mut bin = adjust(f, balance);
-
-                    match stack.last() {
-                        None => {
-                            if let Expr::Function(g) = env.expr(tok.lexeme, Arity::Unary)? {
-                                stack.push(Some(Expr::Function(
-                                    g.clone().prioritize(PRIORITY_SPACE * balance),
-                                )));
-                            }
-                        }
-                        Some(None) => {
-                            bin.precedence -= PRIORITY_SPACE;
-                            stack.pop().expect("result.last() was checked?");
-                            if let Ok(Expr::Function(g)) = env.expr(tok.lexeme, Arity::Unary) {
-                                match stack.last() {
-                                    None | Some(Some(Expr::Function(_))) => {
-                                        stack.push(Some(Expr::Function(
-                                            g.clone().prioritize(PRIORITY_SPACE * balance),
-                                        )))
-                                    }
-                                    Some(None) => unreachable!("two space tokens in a row"),
-                                    _ => stack.push(Some(Expr::Function(bin))),
-                                }
-                            } else {
-                                stack.push(Some(Expr::Function(bin)));
-                            }
-                        }
-                        // Transform SUB into NEG
-                        Some(Some(Expr::Function(_))) => {
-                            if tok.lexeme == "-" {
-                                stack.push(Some(Expr::Function(
-                                    NEG.clone().prioritize(PRIORITY_SPACE * balance),
-                                )));
-                            }
-                        }
-                        _ => stack.push(Some(Expr::Function(bin))),
-                    }
-                } else {
-                    stack.push(Some(Expr::Error(format!(
-                        "no function named '{}'",
-                        tok.lexeme
-                    ))));
-                };
+                exprs.operator(env, tok.lexeme)?;
             }
             TokenType::Space => {
-                if let Some(Some(Expr::Function(bin))) = stack.last_mut() {
-                    if bin.arity <= 2 && !bin.was_spaced() {
-                        bin.prioritize(-PRIORITY_SPACE);
-                    } else {
-                        stack.push(None);
-                    }
-                } else {
-                    stack.push(None);
-                }
+                exprs.space();
             }
             TokenType::Comment => {
                 break;
@@ -157,12 +142,8 @@ pub fn prioritize(tokens: Vec<Token>, env: &crate::env::Env) -> Parsed<Vec<Expr>
             tt => unimplemented!("{:?}", tt),
         }
     }
-    let mut result = vec![];
     // Remove any leftover `None`s (spaces)
-    for expr in stack.into_iter().flatten() {
-        result.push(expr);
-    }
-    Ok(result)
+    Ok(exprs.stack.into_iter().flatten().collect())
 }
 
 #[cfg(test)]
