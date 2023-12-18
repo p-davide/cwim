@@ -8,6 +8,7 @@ pub const PRIORITY_SPACE: i32 = 10;
 pub const PRIORITY_PAREN: i32 = 2 * PRIORITY_SPACE;
 
 struct Exprs {
+    // Inside `stack`, `None` indicates a space.
     stack: Vec<Option<Expr>>,
     balance: i32,
 }
@@ -108,8 +109,10 @@ impl Exprs {
         }
     }
 }
-pub fn prioritize(tokens: Vec<Token>, env: &crate::env::Env) -> Parsed<Vec<Expr>> {
-    // Inside `stack`, `None` indicates a space.
+pub fn prioritize<'a, Tokens: Iterator<Item = &'a Token<'a>>>(
+    tokens: Tokens,
+    env: &Env,
+) -> Parsed<Vec<Expr>> {
     let mut exprs = Exprs::new();
 
     for tok in tokens {
@@ -154,7 +157,7 @@ mod test {
     fn _simple_priority() {
         let it = [Token::lit(8., "8."), Token::sym("-"), Token::lit(9., "9")];
         assert_eq!(
-            prioritize(Vec::from(it), &Env::std()),
+            prioritize(it.iter(), &Env::prelude()),
             Ok(vec![
                 Expr::Literal(8.),
                 Expr::Function(SUB),
@@ -174,7 +177,7 @@ mod test {
             Token::lit(9., "9"),
         ];
         assert_eq!(
-            prioritize(Vec::from(it), &Env::std()),
+            prioritize(it.iter(), &Env::prelude()),
             Ok(vec![
                 Expr::Literal(8.),
                 Expr::Function(SUB.prioritize(-PRIORITY_SPACE)),
@@ -197,7 +200,7 @@ mod test {
             Token::lit(-7., "-7"),
         ];
         assert_eq!(
-            prioritize(Vec::from(it), &Env::std()), // (5+ -6)-7
+            prioritize(it.iter(), &Env::prelude()), // (5+ -6)-7
             Ok(vec![
                 Expr::Literal(5.),
                 Expr::Function(ADD.prioritize(PRIORITY_PAREN - PRIORITY_SPACE)),
@@ -223,7 +226,7 @@ mod test {
             Token::lit(-7., "-7"),
         ];
         assert_eq!(
-            prioritize(Vec::from(it), &Env::std()),
+            prioritize(it.iter(), &Env::prelude()),
             Ok(vec![
                 Expr::Function(NEG),
                 Expr::Literal(5.),
@@ -254,8 +257,9 @@ mod test {
                     Token::lparen(),
                     Token::lit(6., "6"),
                     Token::rparen(),
-                ],
-                &Env::std()
+                ]
+                .iter(),
+                &Env::prelude()
             ),
             Ok(vec![
                 Expr::Function(NEG),

@@ -45,7 +45,7 @@ fn value(symbol: &'static str, n: f64) -> (String, Variable) {
 }
 
 impl Env {
-    pub fn std() -> Self {
+    pub fn prelude() -> Self {
         Self {
             inner: std::collections::HashMap::from([
                 binary("=", ASSIGN),

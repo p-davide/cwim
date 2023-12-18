@@ -1,3 +1,4 @@
+use crate::env::Env;
 use crate::function::*;
 use crate::parser::*;
 use crate::prioritize::*;
@@ -9,7 +10,6 @@ pub enum Expr {
     Literal(f64),
     Function(Function),
     Variable(String),
-    Error(String),
 }
 
 impl Debug for Expr {
@@ -18,7 +18,6 @@ impl Debug for Expr {
             Expr::Literal(n) => write!(f, "{:?}", n),
             Expr::Function(g) => write!(f, "{:?}", g),
             Expr::Variable(n) => write!(f, "V{:?}", n),
-            Expr::Error(msg) => write!(f, "Error: {:?}", msg),
         }
     }
 }
@@ -44,7 +43,6 @@ fn shuntingyard(exprs: Vec<Expr>) -> Parsed<Vec<Expr>> {
                 }
                 ops.push(b)
             }
-            Expr::Error(msg) => return Err(msg),
         }
     }
     while let Some(op) = ops.pop() {
@@ -53,7 +51,7 @@ fn shuntingyard(exprs: Vec<Expr>) -> Parsed<Vec<Expr>> {
     Ok(result)
 }
 
-fn eval(shunted: Vec<Expr>, env: &mut crate::env::Env) -> Parsed<f64> {
+fn eval(shunted: Vec<Expr>, env: &mut Env) -> Parsed<f64> {
     if shunted
         .iter()
         .rev()
@@ -75,11 +73,14 @@ fn eval(shunted: Vec<Expr>, env: &mut crate::env::Env) -> Parsed<f64> {
                     match stack.pop() {
                         Some(n) => {
                             if fun == ASSIGN {
-                                env.assign(
-                                    initializee.unwrap(),
-                                    crate::env::Variable::Value(n),
-                                );
-                                return Ok(n);
+                                return match initializee {
+                                    Some(name) if stack.is_empty() => {
+                                        env.assign(name.clone(), crate::env::Variable::Value(n));
+                                        println!("{} = {}", name, n);
+                                        Ok(n)
+                                    }
+                                    _ => Err(format!("No name found to the left of {}", n)),
+                                };
                             } else {
                                 xs.push(n)
                             }
@@ -95,24 +96,36 @@ fn eval(shunted: Vec<Expr>, env: &mut crate::env::Env) -> Parsed<f64> {
                 let f = fun.f;
                 stack.push(f(xs));
             }
-            Expr::Variable(var) => initializee = Some(var),
-            Expr::Error(msg) => return Err(msg),
+            Expr::Variable(var) => {
+                if let Some(name) = initializee {
+                    return Err(format!(
+                        "Tried to initialize {} and {} at the same time",
+                        var, name
+                    ));
+                } else {
+                    initializee = Some(var);
+                }
+            }
         }
     }
     stack.pop().ok_or("empty stack".to_owned())
 }
 
-pub fn run(text: &str, env: &mut crate::env::Env) -> Parsed<f64> {
+pub fn run(text: &str, env: &mut Env) -> Parsed<f64> {
     let tks = parse(text)?;
-    let parens = prioritize(tks, env)?;
-    let s = shuntingyard(parens)?;
-    eval(s, env)
+    let stmts = tks.split(|t| t.ttype == crate::token::TokenType::Newline);
+    let mut result = Err("nothing was calculated".to_owned());
+    for stmt in stmts {
+        let parens = prioritize(stmt.iter(), env)?;
+        let s = shuntingyard(parens)?;
+        result = eval(s, env);
+    }
+    result
 }
 
 #[cfg(test)]
 mod test {
     use super::*;
-    use crate::env::*;
 
     #[test]
     fn _eval_3() {
@@ -131,7 +144,7 @@ mod test {
                     Expr::Function(ADD),
                     Expr::Function(ADD),
                 ],
-                &mut Env::std()
+                &mut Env::prelude()
             ),
             eval(
                 vec![
@@ -147,7 +160,7 @@ mod test {
                     Expr::Function(POW),
                     Expr::Function(ADD),
                 ],
-                &mut Env::std()
+                &mut Env::prelude()
             )
         );
     }
@@ -218,7 +231,7 @@ mod test {
         assert_eq!(
             eval(
                 vec![Expr::Literal(2.), Expr::Literal(5.), Expr::Function(SUB),],
-                &mut Env::std()
+                &mut Env::prelude()
             ),
             Ok(-3.)
         );
@@ -237,7 +250,7 @@ mod test {
                     Expr::Function(NEG),
                     Expr::Function(MUL.prioritize(-PRIORITY_SPACE)),
                 ],
-                &mut Env::std()
+                &mut Env::prelude()
             ),
             Ok(36.)
         );
