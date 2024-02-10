@@ -3,21 +3,60 @@ use crate::function::*;
 use crate::interpreter::Expr;
 use crate::parser::Parsed;
 use crate::token::*;
+use std::cmp::Ordering;
+use std::fmt::Formatter;
 
-pub const PRIORITY_SPACE: i32 = 10;
-pub const PRIORITY_PAREN: i32 = 2 * PRIORITY_SPACE;
+#[derive(PartialEq, Eq, Ord, Clone, Copy)]
+pub struct Priority {
+    pub op_priority: u16,
+    pub spaces: u16,
+    pub parens: u16,
+}
+impl PartialOrd for Priority {
+    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
+        match self.parens.partial_cmp(&other.parens) {
+            ord @ (Some(Ordering::Less) | Some(Ordering::Greater)) => ord,
+            _ => match other.spaces.partial_cmp(&self.spaces) {
+                ord @ (Some(Ordering::Less) | Some(Ordering::Greater)) => ord,
+                _ => self.op_priority.partial_cmp(&self.op_priority),
+            },
+        }
+    }
+}
+impl std::fmt::Debug for Priority {
+    fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), std::fmt::Error> {
+        write!(f, "{}{}{}", self.parens, 9 - self.spaces, self.op_priority)
+    }
+}
+impl Priority {
+    pub fn new(op_priority: u16) -> Self {
+        Self {
+            op_priority,
+            spaces: 0,
+            parens: 0,
+        }
+    }
+    pub fn paren(&mut self) -> Self {
+        self.parens += 1;
+        *self
+    }
+    pub fn space(&mut self) -> Self {
+        self.spaces += 1;
+        *self
+    }
+}
 
 struct Exprs {
     // Inside `stack`, `None` indicates a space.
     stack: Vec<Option<Expr>>,
-    balance: i32,
+    open_parens: i32,
 }
 
 impl Exprs {
     fn new() -> Self {
         Self {
             stack: vec![],
-            balance: 0,
+            open_parens: 0,
         }
     }
 
@@ -31,10 +70,10 @@ impl Exprs {
     }
 
     fn imply(&mut self, f: Function, spaces: i32) {
-        self.stack.push(Some(Expr::Function(
-            f.clone()
-                .prioritize(PRIORITY_SPACE * (self.balance - spaces)),
-        )))
+        let mut g = f.clone();
+        g.precedence.parens = self.open_parens as u16;
+        g.precedence.spaces = spaces as u16;
+        self.stack.push(Some(Expr::Function(g)))
     }
 
     fn before_expr(&mut self) {
@@ -47,17 +86,17 @@ impl Exprs {
 
     fn lparen(&mut self) {
         self.before_expr();
-        self.balance += 2;
+        self.open_parens += 2;
     }
 
     fn rparen(&mut self) -> Parsed<()> {
-        self.balance -= 2;
-        if self.balance < -1 {
+        self.open_parens -= 2;
+        if self.open_parens < -1 {
             return Err("unmatched )".to_owned());
         }
         // account for " )"
-        if self.balance % 2 == 1 {
-            self.balance += 1;
+        if self.open_parens % 2 == 1 {
+            self.open_parens += 1;
         }
         Ok(())
     }
@@ -83,7 +122,7 @@ impl Exprs {
     fn space(&mut self) {
         match self.stack.last_mut() {
             Some(Some(Expr::Function(bin))) if bin.arity <= 2 && !bin.was_spaced() => {
-                bin.prioritize(-PRIORITY_SPACE);
+                bin.space();
             }
             _ => {
                 self.stack.push(None);
@@ -92,9 +131,9 @@ impl Exprs {
     }
 
     fn operator(&mut self, env: &Env, lexeme: &str) -> Parsed<()> {
-        if let Expr::Function(binary) = env.find_binary(lexeme)? {
+        if let Expr::Function(binary) = env.find_binary_or_literal(lexeme)? {
             let (spaces, last) = self.trim_trailing_spaces();
-            let f = if let Ok(Expr::Function(unary)) = env.find_unary(lexeme) {
+            let f = if let Ok(Expr::Function(unary)) = env.find_unary_or_literal(lexeme) {
                 match last {
                     None | Some(Some(Expr::Function(_))) => unary,
                     _ => binary,
@@ -126,12 +165,12 @@ pub fn prioritize<'a, Tokens: Iterator<Item = &'a Token<'a>>>(
             TokenType::Literal(n) => {
                 exprs.lit(n)?;
             }
-            TokenType::Identifier => match env.find_unary(tok.lexeme) {
+            TokenType::Identifier => match env.find_unary_or_literal(tok.lexeme) {
                 Ok(expr @ Expr::Function(_) | expr @ Expr::Literal(_)) => {
                     exprs.before_expr();
                     exprs.push(expr);
                 }
-                _ => exprs.push(Expr::Variable(tok.lexeme.to_owned())),
+                _ => exprs.push(Expr::Variable(tok.lexeme.to_owned(), 1.)),
             },
             TokenType::Symbol => {
                 exprs.operator(env, tok.lexeme)?;
@@ -180,7 +219,7 @@ mod test {
             prioritize(it.iter(), &Env::prelude()),
             Ok(vec![
                 Expr::Literal(8.),
-                Expr::Function(SUB.prioritize(-PRIORITY_SPACE)),
+                Expr::Function(SUB.space()),
                 Expr::Literal(9.),
             ])
         );
@@ -203,7 +242,7 @@ mod test {
             prioritize(it.iter(), &Env::prelude()), // (5+ -6)-7
             Ok(vec![
                 Expr::Literal(5.),
-                Expr::Function(ADD.prioritize(PRIORITY_PAREN - PRIORITY_SPACE)),
+                Expr::Function(ADD.paren().space()),
                 Expr::Literal(-6.),
                 Expr::Function(ADD),
                 Expr::Literal(-7.),
@@ -230,7 +269,7 @@ mod test {
             Ok(vec![
                 Expr::Function(NEG),
                 Expr::Literal(5.),
-                Expr::Function(ADD.prioritize(PRIORITY_SPACE)),
+                Expr::Function(ADD.space()),
                 Expr::Literal(-6.),
                 Expr::Function(ADD),
                 Expr::Literal(-7.),
@@ -264,7 +303,7 @@ mod test {
             Ok(vec![
                 Expr::Function(NEG),
                 Expr::Literal(6.),
-                Expr::Function(MUL.prioritize(-PRIORITY_SPACE)),
+                Expr::Function(MUL.space()),
                 Expr::Function(NEG),
                 Expr::Literal(6.),
             ])

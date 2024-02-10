@@ -9,7 +9,7 @@ use std::fmt::Formatter;
 pub enum Expr {
     Literal(f64),
     Function(Function),
-    Variable(String),
+    Variable(String, f64),
 }
 
 impl Debug for Expr {
@@ -17,7 +17,7 @@ impl Debug for Expr {
         match self {
             Expr::Literal(n) => write!(f, "{:?}", n),
             Expr::Function(g) => write!(f, "{:?}", g),
-            Expr::Variable(n) => write!(f, "V{:?}", n),
+            Expr::Variable(name, coef) => write!(f, "V{:?}{:?}", coef, name),
         }
     }
 }
@@ -27,17 +27,17 @@ fn shuntingyard(exprs: Vec<Expr>) -> Parsed<Vec<Expr>> {
     let mut ops: Vec<Function> = vec![];
     for expr in exprs {
         match expr {
-            Expr::Literal(_) | Expr::Variable(_) => result.push(expr),
+            Expr::Literal(_) | Expr::Variable(_, _) => result.push(expr),
+            Expr::Function(b) if b.arity != 2 => ops.push(b),
             Expr::Function(b) => {
-                while let Some(op) = ops.last() {
+                while let Some(op) = ops.pop() {
                     // NOTE: This assumes:
                     // - Every binary operator is left-associative.
                     // - Every unary operator is right-associative.
-                    if b.arity == 2 && b.precedence <= op.precedence {
-                        result.push(Expr::Function(
-                            ops.pop().ok_or("no expressions".to_owned())?,
-                        ))
+                    if b.precedence >= op.precedence {
+                        result.push(Expr::Function(op))
                     } else {
+                        ops.push(op);
                         break;
                     }
                 }
@@ -52,16 +52,16 @@ fn shuntingyard(exprs: Vec<Expr>) -> Parsed<Vec<Expr>> {
 }
 
 fn eval(shunted: Vec<Expr>, env: &mut Env) -> Parsed<f64> {
-    if shunted
-        .iter()
-        .rev()
-        .skip(1)
-        .any(|it| *it == Expr::Function(ASSIGN))
-    {
-        return Err(
-            "There must be only one assignment, and its result can't be used as a value".to_owned(),
-        );
-    }
+    // if shunted
+    //     .iter()
+    //     .rev()
+    //     .skip(1)
+    //     .any(|it| *it == Expr::Function(ASSIGN))
+    // {
+    //     return Err(
+    //         "There must be only one assignment, and its result can't be used as a value".to_owned(),
+    //     );
+    // }
     let mut stack = vec![];
     let mut initializee: Option<String> = None;
     for expr in shunted {
@@ -96,7 +96,7 @@ fn eval(shunted: Vec<Expr>, env: &mut Env) -> Parsed<f64> {
                 let f = fun.f;
                 stack.push(f(xs));
             }
-            Expr::Variable(var) => {
+            Expr::Variable(var, _) => {
                 if let Some(name) = initializee {
                     return Err(format!(
                         "Tried to initialize {} and {} at the same time",
@@ -212,7 +212,7 @@ mod test {
             shuntingyard(vec![
                 Expr::Function(NEG),
                 Expr::Literal(6.),
-                Expr::Function(MUL.prioritize(-PRIORITY_SPACE)),
+                Expr::Function(MUL.space()),
                 Expr::Function(NEG),
                 Expr::Literal(6.),
             ]),
@@ -221,7 +221,7 @@ mod test {
                 Expr::Function(NEG),
                 Expr::Literal(6.),
                 Expr::Function(NEG),
-                Expr::Function(MUL.prioritize(-PRIORITY_SPACE)),
+                Expr::Function(MUL.space()),
             ])
         )
     }
@@ -248,7 +248,7 @@ mod test {
                     Expr::Function(NEG),
                     Expr::Literal(6.),
                     Expr::Function(NEG),
-                    Expr::Function(MUL.prioritize(-PRIORITY_SPACE)),
+                    Expr::Function(MUL.space()),
                 ],
                 &mut Env::prelude()
             ),

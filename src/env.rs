@@ -75,7 +75,7 @@ impl Env {
                 unary("tan", TAN),
                 unary("exp", EXP),
                 unary("ln", LN),
-                unary("log2", LOG2),
+                unary("log", LOG),
                 unary("acos", ACOS),
                 unary("asin", ASIN),
                 unary("atan", ATAN),
@@ -99,12 +99,15 @@ impl Env {
         let var = self.inner.get(l);
         match var {
             Some(Variable::Value(n)) => Ok(Expr::Literal(*n)),
-            Some(Variable::Function(_)) => Err(format!("Expected value '{}', found function with that name.", l)),
+            Some(Variable::Function(_)) => Err(format!(
+                "Expected value '{}', found function with that name.",
+                l
+            )),
             None => Err(format!("Can't find '{}'", l)),
         }
     }
 
-    pub fn find_unary(&self, l: &str) -> Parsed<Expr> {
+    pub fn find_unary_or_literal(&self, l: &str) -> Parsed<Expr> {
         let var = self.inner.get(l);
         match var {
             Some(Variable::Function(Functions {
@@ -116,7 +119,7 @@ impl Env {
         }
     }
 
-    pub fn find_binary(&self, l: &str) -> Parsed<Expr> {
+    pub fn find_binary_or_literal(&self, l: &str) -> Parsed<Expr> {
         let var = self.inner.get(l);
         match var {
             Some(Variable::Function(Functions {

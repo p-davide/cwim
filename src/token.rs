@@ -12,6 +12,7 @@ pub enum TokenType {
     Newline,
     Comma,
     Semicolon,
+    Eof,
 }
 
 #[derive(PartialEq, Debug, Copy, Clone)]
