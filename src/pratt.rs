@@ -2,6 +2,7 @@ use crate::env;
 use crate::function::Function;
 use crate::interpreter;
 use crate::token;
+use crate::token::TokenType;
 use std::fmt;
 
 #[derive(Debug, Clone, PartialEq)]
@@ -37,6 +38,11 @@ fn expr_bp(lexer: &mut Vec<token::Token>, env: &env::Env, min_binding: u8) -> S 
                 let rhs = expr_bp(lexer, env, right);
                 S::Fun(t.lexeme.to_owned(), vec![rhs])
             }
+            token::TokenType::LParen => {
+                let lhs = expr_bp(lexer, env, 0);
+                assert_eq!(lexer.pop().map(|it| it.ttype), Some(TokenType::RParen));
+                lhs
+            }
             _ => unreachable!("unexpected token {:?}", t.lexeme),
         },
         _ => unreachable!("empty lexer"),
@@ -45,28 +51,31 @@ fn expr_bp(lexer: &mut Vec<token::Token>, env: &env::Env, min_binding: u8) -> S 
         let op = match lexer.last().copied() {
             None => break,
             Some(t) => match t.ttype {
-                token::TokenType::Symbol => t.lexeme,
-                _ => unreachable!(),
+                token::TokenType::Symbol | token::TokenType::RParen => t.lexeme,
+                t => unreachable!("{:?} with lexer state {:?}",t, lexer),
             },
         };
-        let (left, right) = infix_binding_power(op, env);
-        if left < min_binding {
-            break;
+        if let Some((left, right)) = infix_binding_power(op, env) {
+            if left < min_binding {
+                break;
+            }
+            lexer.pop();
+            let rhs = expr_bp(lexer, env, right);
+            lhs = S::Fun(op.to_owned(), vec![lhs, rhs]);
+            continue;
         }
-        lexer.pop();
-        let rhs = expr_bp(lexer, env, right);
-        lhs = S::Fun(op.to_owned(), vec![lhs, rhs]);
+        break;
     }
     lhs
 }
 
-fn infix_binding_power<'a>(op: &'a str, env: &env::Env) -> (u8, u8) {
+fn infix_binding_power<'a>(op: &'a str, env: &env::Env) -> Option<(u8, u8)> {
     match env.find_binary_or_literal(op) {
         Ok(interpreter::Expr::Function(f)) => {
             let it = f.precedence.op_priority as u8;
-            (it * 2, it * 2 + 1)
+            Some((it * 2, it * 2 + 1))
         }
-        _ => panic!("bad op: {:?}", op),
+        _ => None,
     }
 }
 fn prefix_binding_power<'a>(op: &'a str, env: &env::Env) -> ((), u8) {
@@ -104,5 +113,9 @@ mod test {
     #[test]
     fn _d() {
         tokenize_and_parse("--1*2", "(* (- -1) 2)");
+    }
+    #[test]
+    fn _e() {
+        tokenize_and_parse("(((0)))", "0");
     }
 }
