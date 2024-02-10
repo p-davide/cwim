@@ -37,9 +37,9 @@ fn expr_bp(lexer: &mut Vec<token::Token>, env: &env::Env, min_binding: u8) -> S 
                 let rhs = expr_bp(lexer, env, right);
                 S::Fun(t.lexeme.to_owned(), vec![rhs])
             }
-            _ => unimplemented!(),
+            _ => unreachable!("unexpected token {:?}", t.lexeme),
         },
-        _ => unimplemented!(),
+        _ => unreachable!("empty lexer"),
     };
     loop {
         let op = match lexer.last().copied() {
@@ -53,6 +53,7 @@ fn expr_bp(lexer: &mut Vec<token::Token>, env: &env::Env, min_binding: u8) -> S 
         if left < min_binding {
             break;
         }
+        lexer.pop();
         let rhs = expr_bp(lexer, env, right);
         lhs = S::Fun(op.to_owned(), vec![lhs, rhs]);
     }
@@ -60,15 +61,20 @@ fn expr_bp(lexer: &mut Vec<token::Token>, env: &env::Env, min_binding: u8) -> S 
 }
 
 fn infix_binding_power<'a>(op: &'a str, env: &env::Env) -> (u8, u8) {
-    match op {
-        "+" | "-" => (1, 2),
-        "*" | "/" => (3, 4),
+    match env.find_binary_or_literal(op) {
+        Ok(interpreter::Expr::Function(f)) => {
+            let it = f.precedence.op_priority as u8;
+            (it * 2, it * 2 + 1)
+        }
         _ => panic!("bad op: {:?}", op),
     }
 }
 fn prefix_binding_power<'a>(op: &'a str, env: &env::Env) -> ((), u8) {
-    match op {
-        "+" | "-" => ((), 5),
+    match env.find_unary_or_literal(op) {
+        Ok(interpreter::Expr::Function(f)) => {
+            let it = f.precedence.op_priority as u8;
+            ((), it * 2 + 1)
+        }
         _ => panic!("bad op: {:?}", op),
     }
 }
