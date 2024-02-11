@@ -49,10 +49,13 @@ fn pop_trailing_space<'a>(lexer: &mut Vec<Token<'a>>) -> Option<Token<'a>> {
 
 fn infix_adjust_spaces<'a>(lexer: &mut Vec<Token<'a>>) -> (u16, Option<Token<'a>>) {
     let pre_spaces = pop_trailing_space(lexer).map_or(0, |it| it.lexeme.len() as u16);
-    let token = lexer.pop();
+    let maybe_token = lexer.pop();
     let post_spaces = pop_trailing_space(lexer).map_or(0, |it| it.lexeme.len() as u16);
-    token.and_then(|t| Some(lexer.push(t)));
-    (std::cmp::max(pre_spaces, post_spaces), token)
+    maybe_token.map(|token| {
+        lexer.push(token);
+        Some(())
+    });
+    (std::cmp::max(pre_spaces, post_spaces), maybe_token)
 }
 
 fn get_infix_by_name(name: &str, env: &env::Env) -> Function {
@@ -89,6 +92,14 @@ fn expr_bp(lexer: &mut Vec<Token>, env: &env::Env, min_binding: Priority) -> S {
                 );
                 lhs
             }
+            // TODO: This assumes every name is of a unary prefix function.
+            //       Functions with more args should be supported.
+            TokenType::Identifier => {
+                let ((), right) = prefix_binding_power(t.lexeme, env);
+                let spaces = pop_trailing_space(lexer).map_or(0, |it| it.lexeme.len() as u16);
+                let rhs = expr_bp(lexer, env, Priority { spaces, ..right });
+                S::Fun(get_prefix_by_name(t.lexeme, env), vec![rhs])
+            }
             _ => unreachable!("unexpected token {:?}, lexer state: {:?}", t.lexeme, lexer),
         },
         _ => unreachable!("empty lexer"),
@@ -102,6 +113,11 @@ fn expr_bp(lexer: &mut Vec<Token>, env: &env::Env, min_binding: Priority) -> S {
                     let (spaces, maybe_op) = infix_adjust_spaces(lexer);
                     let op = maybe_op.map_or("", |it| it.lexeme);
                     (spaces, op)
+                }
+                // Finding a ( here instead of an operator means the expression is like ...2(3+...
+                // We treat this as a multiplication.
+                TokenType::LParen => {
+                    (0xffff, "*")
                 }
                 t => unreachable!("{:?} with lexer state {:?}", t, lexer),
             },
@@ -150,7 +166,7 @@ fn prefix_binding_power(op: &str, env: &env::Env) -> ((), Priority) {
 pub fn eval(s: &S) -> f64 {
     match s {
         S::Var(n) => *n,
-        S::Fun(f, xs) => (f.f)(xs.iter().rev().map(|ss| eval(ss)).collect()),
+        S::Fun(f, xs) => (f.f)(xs.iter().rev().map(eval).collect()),
     }
 }
 

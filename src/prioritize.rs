@@ -6,7 +6,7 @@ use crate::token::*;
 use std::cmp::Ordering;
 use std::fmt::Formatter;
 
-#[derive(PartialEq, Eq, Ord, Clone, Copy)]
+#[derive(PartialEq, Eq, Clone, Copy)]
 pub struct Priority {
     pub op_priority: u16,
     pub spaces: u16,
@@ -44,7 +44,7 @@ impl Priority {
             parens: 0,
         }
     }
-    
+
     pub fn paren(&mut self) -> Self {
         self.parens += 1;
         *self
@@ -79,7 +79,7 @@ impl Exprs {
     }
 
     fn imply(&mut self, f: Function, spaces: i32) {
-        let mut g = f.clone();
+        let mut g = f;
         g.precedence.parens = self.open_parens as u16;
         g.precedence.spaces = spaces as u16;
         self.stack.push(Some(Expr::Function(g)))
