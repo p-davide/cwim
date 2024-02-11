@@ -30,21 +30,41 @@ fn expr(lexer: &mut Vec<Token>, env: &env::Env) -> S {
     expr_bp(lexer, env, Priority::min())
 }
 
+fn pop_trailing_space<'a>(lexer: &mut Vec<Token<'a>>) -> Option<Token<'a>> {
+    if lexer.last().is_some_and(|it| it.ttype == TokenType::Space) {
+        lexer.pop()
+    } else {
+        None
+    }
+}
+
 fn expr_bp(lexer: &mut Vec<Token>, env: &env::Env, min_binding: Priority) -> S {
     let mut lhs = match lexer.pop() {
         Some(t) => match t.ttype {
             TokenType::Literal(n) => S::Var(n),
             TokenType::Symbol => {
                 let ((), right) = prefix_binding_power(t.lexeme, env);
-                let rhs = expr_bp(lexer, env, right);
+                let spaces = pop_trailing_space(lexer).map_or(0, |it| it.lexeme.len() as u16);
+                let rhs = expr_bp(lexer, env, Priority { spaces, ..right });
                 S::Fun(t.lexeme.to_owned(), vec![rhs])
             }
             TokenType::LParen => {
-                let lhs = expr_bp(lexer, env, Priority::min());
-                assert_eq!(lexer.pop().map(|it| it.ttype), Some(TokenType::RParen));
+                let lhs = expr_bp(
+                    {
+                        pop_trailing_space(lexer);
+                        lexer
+                    },
+                    env,
+                    Priority::min(),
+                );
+                // eof is assumed to close every (, such that eg -(5-6 = 1
+                assert_eq!(
+                    lexer.pop().map_or(TokenType::RParen, |it| it.ttype),
+                    TokenType::RParen
+                );
                 lhs
             }
-            _ => unreachable!("unexpected token {:?}", t.lexeme),
+            _ => unreachable!("unexpected token {:?}, lexer state: {:?}", t.lexeme, lexer),
         },
         _ => unreachable!("empty lexer"),
     };
@@ -52,16 +72,33 @@ fn expr_bp(lexer: &mut Vec<Token>, env: &env::Env, min_binding: Priority) -> S {
         let op = match lexer.last().copied() {
             None => break,
             Some(t) => match t.ttype {
-                TokenType::Symbol | TokenType::RParen => t.lexeme,
+                TokenType::Symbol | TokenType::RParen | TokenType::Space => t.lexeme,
                 t => unreachable!("{:?} with lexer state {:?}", t, lexer),
             },
         };
-        if let Some((mut left, mut right)) = infix_binding_power(op, env) {
+        let spaces = if lexer.last().is_some_and(|it| it.ttype == TokenType::Space) {
+            lexer.pop().unwrap().lexeme.len() as u16
+        } else {
+            0
+        };
+        if let Some((left, right)) = infix_binding_power(op, env) {
             if left < min_binding {
                 break;
             }
             lexer.pop();
-            let rhs = expr_bp(lexer, env, right);
+            if lexer.last().is_some_and(|it| it.ttype == TokenType::Space) {
+                // TODO: Take right spacing into consideration
+                lexer.pop();
+            }
+            let rhs = expr_bp(
+                lexer,
+                env,
+                Priority {
+                    op_priority: right.op_priority,
+                    spaces: std::cmp::min(min_binding.spaces, spaces),
+                    parens: 0,
+                },
+            );
             lhs = S::Fun(op.to_owned(), vec![lhs, rhs]);
             continue;
         }
@@ -121,10 +158,14 @@ mod test {
     }
     #[test]
     fn _f() {
-        tokenize_and_parse("- -1*2", "(- (* -1) 2)");
+        tokenize_and_parse("- -1*2", "(- (* -1 2))");
     }
     #[test]
     fn _g() {
         tokenize_and_parse("1+2 * 3", "(* (+ 1 2) 3)");
+    }
+    #[test]
+    fn _h() {
+        tokenize_and_parse("(((0", "0");
     }
 }
