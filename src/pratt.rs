@@ -146,11 +146,11 @@ mod test {
     }
     #[test]
     fn _c() {
-        tokenize_and_parse("--1", "(- -1)");
+        tokenize_and_parse("--1", "(- (- 1))");
     }
     #[test]
     fn _d() {
-        tokenize_and_parse("--1*2", "(* (- -1) 2)");
+        tokenize_and_parse("--1*2", "(* (- (- 1)) 2)");
     }
     #[test]
     fn _e() {
@@ -158,7 +158,7 @@ mod test {
     }
     #[test]
     fn _f() {
-        tokenize_and_parse("- -1*2", "(- (* -1 2))");
+        tokenize_and_parse("- -1*2", "(- (* (- 1) 2))");
     }
     #[test]
     fn _g() {
@@ -167,5 +167,25 @@ mod test {
     #[test]
     fn _h() {
         tokenize_and_parse("(((0", "0");
+    }
+    #[test]
+    fn _i() {
+        tokenize_and_parse("8.-9.", "(- 8 9)")
+    }
+    #[test]
+    fn _j() {
+        tokenize_and_parse("8. - 9.", "(- 8 9)")
+    }
+    #[test]
+    fn _k() {
+        tokenize_and_parse("(5+ -6)-7", "(- (+ 5 (- 6)) 7)")
+    }
+    #[test]
+    fn _l() {
+        tokenize_and_parse("-(5+ -6)-7", "(- (- (+ 5 (- 6))) 7)")
+    }
+    #[test]
+    fn _m() {
+        tokenize_and_parse("-(6) * -(6)", "(* (- 6) (- 6))")
     }
 }
