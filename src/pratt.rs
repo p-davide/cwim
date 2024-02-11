@@ -9,14 +9,15 @@ use std::fmt;
 #[derive(Debug, Clone, PartialEq)]
 enum S {
     Var(f64),
-    Fun(String, Vec<S>),
+    Fun(Function, Vec<S>),
 }
+
 impl fmt::Display for S {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             S::Var(i) => write!(f, "{}", i),
             S::Fun(head, rest) => {
-                write!(f, "({}", head)?;
+                write!(f, "({}", head.name)?;
                 for s in rest {
                     write!(f, " {}", s)?
                 }
@@ -25,6 +26,7 @@ impl fmt::Display for S {
         }
     }
 }
+
 fn expr(lexer: &mut Vec<Token>, env: &env::Env) -> S {
     lexer.reverse();
     expr_bp(lexer, env, Priority::min())
@@ -46,6 +48,13 @@ fn infix_adjust_spaces<'a>(lexer: &mut Vec<Token<'a>>) -> (u16, Option<Token<'a>
     (std::cmp::max(pre_spaces, post_spaces), token)
 }
 
+fn get_infix_by_name(name: &str, env: &env::Env) -> Function {
+    match env.find_binary_or_literal(name) {
+        Ok(interpreter::Expr::Function(f)) => f,
+        _ => panic!("Unary {} not found", name),
+    }
+}
+
 fn expr_bp(lexer: &mut Vec<Token>, env: &env::Env, min_binding: Priority) -> S {
     let mut lhs = match lexer.pop() {
         Some(t) => match t.ttype {
@@ -54,17 +63,11 @@ fn expr_bp(lexer: &mut Vec<Token>, env: &env::Env, min_binding: Priority) -> S {
                 let ((), right) = prefix_binding_power(t.lexeme, env);
                 let spaces = pop_trailing_space(lexer).map_or(0, |it| it.lexeme.len() as u16);
                 let rhs = expr_bp(lexer, env, Priority { spaces, ..right });
-                S::Fun(t.lexeme.to_owned(), vec![rhs])
+                S::Fun(get_infix_by_name(t.lexeme, env), vec![rhs])
             }
             TokenType::LParen => {
-                let lhs = expr_bp(
-                    {
-                        pop_trailing_space(lexer);
-                        lexer
-                    },
-                    env,
-                    Priority::min(),
-                );
+                pop_trailing_space(lexer);
+                let lhs = expr_bp(lexer, env, Priority::min());
                 // eof is assumed to close every (, such that eg -(5-6 = 1
                 assert_eq!(
                     lexer.pop().map_or(TokenType::RParen, |it| it.ttype),
@@ -94,10 +97,6 @@ fn expr_bp(lexer: &mut Vec<Token>, env: &env::Env, min_binding: Priority) -> S {
                 break;
             }
             lexer.pop();
-            if lexer.last().is_some_and(|it| it.ttype == TokenType::Space) {
-                // TODO: Take right spacing into consideration
-                lexer.pop();
-            }
             let rhs = expr_bp(
                 lexer,
                 env,
@@ -106,7 +105,7 @@ fn expr_bp(lexer: &mut Vec<Token>, env: &env::Env, min_binding: Priority) -> S {
                     ..right
                 },
             );
-            lhs = S::Fun(op.to_owned(), vec![lhs, rhs]);
+            lhs = S::Fun(get_infix_by_name(op, env), vec![lhs, rhs]);
             continue;
         }
         break;
@@ -123,6 +122,7 @@ fn infix_binding_power(op: &str, env: &env::Env) -> Option<(Priority, Priority)>
         _ => None,
     }
 }
+
 fn prefix_binding_power(op: &str, env: &env::Env) -> ((), Priority) {
     match env.find_unary_or_literal(op) {
         Ok(interpreter::Expr::Function(f)) => {
@@ -130,6 +130,13 @@ fn prefix_binding_power(op: &str, env: &env::Env) -> ((), Priority) {
             ((), Priority::new(it * 2 + 1))
         }
         _ => panic!("bad op: {:?}", op),
+    }
+}
+
+fn eval(s: &S) -> f64 {
+    match s {
+        S::Var(n) => *n,
+        S::Fun(f, xs) => (f.f)(xs.iter().map(|ss| eval(ss)).collect()),
     }
 }
 
