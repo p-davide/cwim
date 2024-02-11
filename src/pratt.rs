@@ -1,7 +1,8 @@
 use crate::env;
 use crate::function::Function;
 use crate::interpreter;
-use crate::token;
+use crate::prioritize::Priority;
+use crate::token::Token;
 use crate::token::TokenType;
 use std::fmt;
 
@@ -24,22 +25,22 @@ impl fmt::Display for S {
         }
     }
 }
-fn expr(lexer: &mut Vec<token::Token>, env: &env::Env) -> S {
+fn expr(lexer: &mut Vec<Token>, env: &env::Env) -> S {
     lexer.reverse();
-    expr_bp(lexer, env, 0)
+    expr_bp(lexer, env, Priority::min())
 }
 
-fn expr_bp(lexer: &mut Vec<token::Token>, env: &env::Env, min_binding: u16) -> S {
+fn expr_bp(lexer: &mut Vec<Token>, env: &env::Env, min_binding: Priority) -> S {
     let mut lhs = match lexer.pop() {
         Some(t) => match t.ttype {
-            token::TokenType::Literal(n) => S::Var(n),
-            token::TokenType::Symbol => {
+            TokenType::Literal(n) => S::Var(n),
+            TokenType::Symbol => {
                 let ((), right) = prefix_binding_power(t.lexeme, env);
                 let rhs = expr_bp(lexer, env, right);
                 S::Fun(t.lexeme.to_owned(), vec![rhs])
             }
-            token::TokenType::LParen => {
-                let lhs = expr_bp(lexer, env, 0);
+            TokenType::LParen => {
+                let lhs = expr_bp(lexer, env, Priority::min());
                 assert_eq!(lexer.pop().map(|it| it.ttype), Some(TokenType::RParen));
                 lhs
             }
@@ -51,11 +52,11 @@ fn expr_bp(lexer: &mut Vec<token::Token>, env: &env::Env, min_binding: u16) -> S
         let op = match lexer.last().copied() {
             None => break,
             Some(t) => match t.ttype {
-                token::TokenType::Symbol | token::TokenType::RParen => t.lexeme,
+                TokenType::Symbol | TokenType::RParen => t.lexeme,
                 t => unreachable!("{:?} with lexer state {:?}", t, lexer),
             },
         };
-        if let Some((left, right)) = infix_binding_power(op, env) {
+        if let Some((mut left, mut right)) = infix_binding_power(op, env) {
             if left < min_binding {
                 break;
             }
@@ -69,20 +70,20 @@ fn expr_bp(lexer: &mut Vec<token::Token>, env: &env::Env, min_binding: u16) -> S
     lhs
 }
 
-fn infix_binding_power<'a>(op: &'a str, env: &env::Env) -> Option<(u16, u16)> {
+fn infix_binding_power(op: &str, env: &env::Env) -> Option<(Priority, Priority)> {
     match env.find_binary_or_literal(op) {
         Ok(interpreter::Expr::Function(f)) => {
             let it = f.precedence.op_priority;
-            Some((it * 2, it * 2 + 1))
+            Some((Priority::new(it * 2), Priority::new(it * 2 + 1)))
         }
         _ => None,
     }
 }
-fn prefix_binding_power<'a>(op: &'a str, env: &env::Env) -> ((), u16) {
+fn prefix_binding_power(op: &str, env: &env::Env) -> ((), Priority) {
     match env.find_unary_or_literal(op) {
         Ok(interpreter::Expr::Function(f)) => {
             let it = f.precedence.op_priority;
-            ((), it * 2 + 1)
+            ((), Priority::new(it * 2 + 1))
         }
         _ => panic!("bad op: {:?}", op),
     }
@@ -117,5 +118,13 @@ mod test {
     #[test]
     fn _e() {
         tokenize_and_parse("(((0)))", "0");
+    }
+    #[test]
+    fn _f() {
+        tokenize_and_parse("- -1*2", "(- (* -1) 2)");
+    }
+    #[test]
+    fn _g() {
+        tokenize_and_parse("1+2 * 3", "(* (+ 1 2) 3)");
     }
 }

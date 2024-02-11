@@ -18,7 +18,7 @@ impl PartialOrd for Priority {
             ord @ (Some(Ordering::Less) | Some(Ordering::Greater)) => ord,
             _ => match other.spaces.partial_cmp(&self.spaces) {
                 ord @ (Some(Ordering::Less) | Some(Ordering::Greater)) => ord,
-                _ => self.op_priority.partial_cmp(&self.op_priority),
+                _ => self.op_priority.partial_cmp(&other.op_priority),
             },
         }
     }
@@ -29,13 +29,22 @@ impl std::fmt::Debug for Priority {
     }
 }
 impl Priority {
-    pub fn new(op_priority: u16) -> Self {
+    pub const fn new(op_priority: u16) -> Self {
         Self {
             op_priority,
             spaces: 0,
             parens: 0,
         }
     }
+
+    pub const fn min() -> Self {
+        Self {
+            op_priority: 0,
+            spaces: 0xffff,
+            parens: 0,
+        }
+    }
+    
     pub fn paren(&mut self) -> Self {
         self.parens += 1;
         *self
