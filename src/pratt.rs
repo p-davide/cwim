@@ -6,8 +6,8 @@ use crate::token::Token;
 use crate::token::TokenType;
 use std::fmt;
 
-#[derive(Debug, Clone, PartialEq)]
-enum S {
+#[derive(Clone, PartialEq)]
+pub enum S {
     Var(f64),
     Fun(Function, Vec<S>),
 }
@@ -27,8 +27,15 @@ impl fmt::Display for S {
     }
 }
 
-fn expr(lexer: &mut Vec<Token>, env: &env::Env) -> S {
+impl fmt::Debug for S {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{}", self)
+    }
+}
+
+pub fn expr(lexer: &mut Vec<Token>, env: &env::Env) -> S {
     lexer.reverse();
+    pop_trailing_space(lexer);
     expr_bp(lexer, env, Priority::min())
 }
 
@@ -55,6 +62,13 @@ fn get_infix_by_name(name: &str, env: &env::Env) -> Function {
     }
 }
 
+fn get_prefix_by_name(name: &str, env: &env::Env) -> Function {
+    match env.find_unary_or_literal(name) {
+        Ok(interpreter::Expr::Function(f)) => f,
+        _ => panic!("Unary {} not found", name),
+    }
+}
+
 fn expr_bp(lexer: &mut Vec<Token>, env: &env::Env, min_binding: Priority) -> S {
     let mut lhs = match lexer.pop() {
         Some(t) => match t.ttype {
@@ -63,7 +77,7 @@ fn expr_bp(lexer: &mut Vec<Token>, env: &env::Env, min_binding: Priority) -> S {
                 let ((), right) = prefix_binding_power(t.lexeme, env);
                 let spaces = pop_trailing_space(lexer).map_or(0, |it| it.lexeme.len() as u16);
                 let rhs = expr_bp(lexer, env, Priority { spaces, ..right });
-                S::Fun(get_infix_by_name(t.lexeme, env), vec![rhs])
+                S::Fun(get_prefix_by_name(t.lexeme, env), vec![rhs])
             }
             TokenType::LParen => {
                 pop_trailing_space(lexer);
@@ -133,10 +147,10 @@ fn prefix_binding_power(op: &str, env: &env::Env) -> ((), Priority) {
     }
 }
 
-fn eval(s: &S) -> f64 {
+pub fn eval(s: &S) -> f64 {
     match s {
         S::Var(n) => *n,
-        S::Fun(f, xs) => (f.f)(xs.iter().map(|ss| eval(ss)).collect()),
+        S::Fun(f, xs) => (f.f)(xs.iter().rev().map(|ss| eval(ss)).collect()),
     }
 }
 
@@ -177,6 +191,9 @@ mod test {
     #[test]
     fn _g() {
         tokenize_and_parse("1+2 * 3", "(* (+ 1 2) 3)");
+        tokenize_and_parse("234*5", "(* 234 5)");
+        tokenize_and_parse("234*5+7*8", "(+ (* 234 5) (* 7 8))");
+        tokenize_and_parse("-6 *-6", "(* (- 6) (- 6))");
     }
     #[test]
     fn _h() {

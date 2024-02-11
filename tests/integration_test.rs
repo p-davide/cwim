@@ -38,6 +38,11 @@ fn _run_with_spaces_2() {
 }
 
 #[test]
+fn _reg_1() {
+    _test_run("2(log10 * 7)", 14.);
+}
+
+#[test]
 fn _a() {
     _test_run(
         "2 ^ 4 * 5 + 6 + 1 ^ 9",
@@ -89,7 +94,10 @@ fn _just_a_number() {
 
 #[test]
 fn _unmatched_parens() {
-    assert_eq!(run("4)", &mut Env::prelude()), Err("unmatched )".to_owned()));
+    assert_eq!(
+        run("4)", &mut Env::prelude()),
+        Ok(4.)
+    );
 }
 
 #[test]
@@ -118,6 +126,11 @@ fn _double_unary() {
         1. - run("acosh cosh(3-2)", &mut Env::prelude()).unwrap() < std::f64::EPSILON,
         true
     );
+}
+
+#[test]
+fn _1st_deg_poly() {
+    assert_eq!(run("7x", &mut Env::prelude()).is_err(), true)
 }
 
 // TODO: Test assignments more.
