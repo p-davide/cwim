@@ -29,7 +29,7 @@ fn expr(lexer: &mut Vec<token::Token>, env: &env::Env) -> S {
     expr_bp(lexer, env, 0)
 }
 
-fn expr_bp(lexer: &mut Vec<token::Token>, env: &env::Env, min_binding: u8) -> S {
+fn expr_bp(lexer: &mut Vec<token::Token>, env: &env::Env, min_binding: u16) -> S {
     let mut lhs = match lexer.pop() {
         Some(t) => match t.ttype {
             token::TokenType::Literal(n) => S::Var(n),
@@ -52,7 +52,7 @@ fn expr_bp(lexer: &mut Vec<token::Token>, env: &env::Env, min_binding: u8) -> S 
             None => break,
             Some(t) => match t.ttype {
                 token::TokenType::Symbol | token::TokenType::RParen => t.lexeme,
-                t => unreachable!("{:?} with lexer state {:?}",t, lexer),
+                t => unreachable!("{:?} with lexer state {:?}", t, lexer),
             },
         };
         if let Some((left, right)) = infix_binding_power(op, env) {
@@ -69,19 +69,19 @@ fn expr_bp(lexer: &mut Vec<token::Token>, env: &env::Env, min_binding: u8) -> S 
     lhs
 }
 
-fn infix_binding_power<'a>(op: &'a str, env: &env::Env) -> Option<(u8, u8)> {
+fn infix_binding_power<'a>(op: &'a str, env: &env::Env) -> Option<(u16, u16)> {
     match env.find_binary_or_literal(op) {
         Ok(interpreter::Expr::Function(f)) => {
-            let it = f.precedence.op_priority as u8;
+            let it = f.precedence.op_priority;
             Some((it * 2, it * 2 + 1))
         }
         _ => None,
     }
 }
-fn prefix_binding_power<'a>(op: &'a str, env: &env::Env) -> ((), u8) {
+fn prefix_binding_power<'a>(op: &'a str, env: &env::Env) -> ((), u16) {
     match env.find_unary_or_literal(op) {
         Ok(interpreter::Expr::Function(f)) => {
-            let it = f.precedence.op_priority as u8;
+            let it = f.precedence.op_priority;
             ((), it * 2 + 1)
         }
         _ => panic!("bad op: {:?}", op),

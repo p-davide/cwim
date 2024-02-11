@@ -274,7 +274,7 @@ pub const MUL: Function = Function {
     precedence: Priority {
         spaces: 0,
         parens: 0,
-        op_priority: (5),
+        op_priority: 6,
     },
 };
 
@@ -285,7 +285,7 @@ pub const DIV: Function = Function {
     precedence: Priority {
         spaces: 0,
         parens: 0,
-        op_priority: (5),
+        op_priority: 6,
     },
 };
 
@@ -298,11 +298,10 @@ pub const REM: Function = Function {
     precedence: Priority {
         spaces: 0,
         parens: 0,
-        op_priority: (5),
+        op_priority: 6,
     },
 };
 
-// TODO: Make right-associative
 pub const POW: Function = Function {
     name: "^",
     arity: 2,
@@ -310,7 +309,7 @@ pub const POW: Function = Function {
     precedence: Priority {
         spaces: 0,
         parens: 0,
-        op_priority: (6),
+        op_priority: 7,
     },
 };
 
