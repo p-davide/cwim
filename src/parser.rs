@@ -22,7 +22,7 @@ fn parse_token(text: &str) -> Parsed<Token> {
         return parse_identifier(text);
     }
     match c {
-        '-' => parse_number(text).or_else(|_| parse_symbol(text)),
+        '-' => parse_symbol(text),
         ' ' => parse_space(text),
         '\n' => parse_newline(text),
         '[' => parse_lbracket(text),
@@ -158,13 +158,16 @@ mod test {
             Token::lit(7., "7"),
             Token::sym("*"),
             Token::lit(8., "8"),
-            Token::lit(-18., "-18"),
+            Token::sym("-"),
+            Token::lit(18., "18"),
             Token::sym("^"),
             Token::lit(3., "3"),
         ]);
         assert_eq!(
             actual,
-            Ok(vec!["234", "*", "5", "+", "7", "*", "8", "-18", "^", "3",])
+            Ok(vec![
+                "234", "*", "5", "+", "7", "*", "8", "-", "18", "^", "3",
+            ])
         );
         assert_eq!(parse("234*5+7*8-18^3"), expected);
     }
@@ -190,20 +193,24 @@ mod test {
         let to_parse = "-1 +4";
         let actual = parse(to_parse).map(|ts| ts.iter().map(|t| t.lexeme).collect());
         let expected: Parsed<Vec<Token>> = Ok(vec![
-            Token::lit(-1., "-1"),
+            Token::sym("-"),
+            Token::lit(1., "1"),
             Token::space(),
             Token::sym("+"),
             Token::lit(4., "4"),
         ]);
         assert_eq!(parse(to_parse), expected);
-        assert_eq!(actual, Ok(vec!["-1", " ", "+", "4"]));
+        assert_eq!(actual, Ok(vec!["-", "1", " ", "+", "4"]));
     }
 
     #[test]
     fn _c() {
         let to_parse = "-( -1 +4)";
         let actual = parse(to_parse).map(|ts| ts.iter().map(|t| t.lexeme).collect());
-        assert_eq!(actual, Ok(vec!["-", "(", " ", "-1", " ", "+", "4", ")"]));
+        assert_eq!(
+            actual,
+            Ok(vec!["-", "(", " ", "-", "1", " ", "+", "4", ")"])
+        );
     }
     //" -(6) * -(6)"
     #[test]

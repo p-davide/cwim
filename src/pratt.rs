@@ -38,6 +38,14 @@ fn pop_trailing_space<'a>(lexer: &mut Vec<Token<'a>>) -> Option<Token<'a>> {
     }
 }
 
+fn infix_adjust_spaces<'a>(lexer: &mut Vec<Token<'a>>) -> (u16, Option<Token<'a>>) {
+    let pre_spaces = pop_trailing_space(lexer).map_or(0, |it| it.lexeme.len() as u16);
+    let token = lexer.pop();
+    let post_spaces = pop_trailing_space(lexer).map_or(0, |it| it.lexeme.len() as u16);
+    token.and_then(|t| Some(lexer.push(t)));
+    (std::cmp::max(pre_spaces, post_spaces), token)
+}
+
 fn expr_bp(lexer: &mut Vec<Token>, env: &env::Env, min_binding: Priority) -> S {
     let mut lhs = match lexer.pop() {
         Some(t) => match t.ttype {
@@ -68,21 +76,21 @@ fn expr_bp(lexer: &mut Vec<Token>, env: &env::Env, min_binding: Priority) -> S {
         },
         _ => unreachable!("empty lexer"),
     };
+
     loop {
-        let op = match lexer.last().copied() {
+        let (spaces, op) = match lexer.last().copied() {
             None => break,
             Some(t) => match t.ttype {
-                TokenType::Symbol | TokenType::RParen | TokenType::Space => t.lexeme,
+                TokenType::Symbol | TokenType::RParen | TokenType::Space => {
+                    let (spaces, maybe_op) = infix_adjust_spaces(lexer);
+                    let op = maybe_op.map_or("", |it| it.lexeme);
+                    (spaces, op)
+                }
                 t => unreachable!("{:?} with lexer state {:?}", t, lexer),
             },
         };
-        let spaces = if lexer.last().is_some_and(|it| it.ttype == TokenType::Space) {
-            lexer.pop().unwrap().lexeme.len() as u16
-        } else {
-            0
-        };
         if let Some((left, right)) = infix_binding_power(op, env) {
-            if left < min_binding {
+            if (Priority { spaces, ..left }) < min_binding {
                 break;
             }
             lexer.pop();
@@ -94,9 +102,8 @@ fn expr_bp(lexer: &mut Vec<Token>, env: &env::Env, min_binding: Priority) -> S {
                 lexer,
                 env,
                 Priority {
-                    op_priority: right.op_priority,
                     spaces: std::cmp::min(min_binding.spaces, spaces),
-                    parens: 0,
+                    ..right
                 },
             );
             lhs = S::Fun(op.to_owned(), vec![lhs, rhs]);
