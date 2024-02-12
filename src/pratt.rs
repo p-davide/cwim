@@ -75,7 +75,7 @@ fn expr_bp(lexer: &mut Vec<Token>, env: &env::Env, min_binding: Priority) -> S {
             TokenType::Symbol => {
                 let ((), right) = prefix_binding_power(t.lexeme, env);
                 let spaces = pop_trailing_space(lexer).map_or(0, |it| it.lexeme.len() as u16);
-                let rhs = expr_bp(lexer, env, Priority { spaces, ..right });
+                let rhs = expr_bp(lexer, env, Priority { spaces, op_priority: right });
                 S::Fun(get_prefix_by_name(t.lexeme, env), vec![rhs])
             }
             TokenType::LParen => {
@@ -95,7 +95,7 @@ fn expr_bp(lexer: &mut Vec<Token>, env: &env::Env, min_binding: Priority) -> S {
                 Ok(Expr::Function(_)) => {
                     let ((), right) = prefix_binding_power(t.lexeme, env);
                     let spaces = pop_trailing_space(lexer).map_or(0, |it| it.lexeme.len() as u16);
-                    let rhs = expr_bp(lexer, env, Priority { spaces, ..right });
+                    let rhs = expr_bp(lexer, env, Priority { spaces, op_priority: right });
                     S::Fun(get_prefix_by_name(t.lexeme, env), vec![rhs])
                 }
                 Ok(Expr::Literal(n)) => S::Var(n),
@@ -125,7 +125,7 @@ fn expr_bp(lexer: &mut Vec<Token>, env: &env::Env, min_binding: Priority) -> S {
         };
 
         if let Some((left, right)) = infix_binding_power(op, env) {
-            let op_priority = Priority { spaces, ..left };
+            let op_priority = Priority { spaces, op_priority: left };
             if op_priority < min_binding {
                 break;
             }
@@ -135,7 +135,7 @@ fn expr_bp(lexer: &mut Vec<Token>, env: &env::Env, min_binding: Priority) -> S {
                 env,
                 Priority {
                     spaces: std::cmp::min(min_binding.spaces, spaces),
-                    ..right
+                    op_priority: right
                 },
             );
             lhs = S::Fun(get_infix_by_name(op, env), vec![lhs, rhs]);
@@ -146,21 +146,21 @@ fn expr_bp(lexer: &mut Vec<Token>, env: &env::Env, min_binding: Priority) -> S {
     lhs
 }
 
-fn infix_binding_power(op: &str, env: &env::Env) -> Option<(Priority, Priority)> {
+fn infix_binding_power(op: &str, env: &env::Env) -> Option<(u16, u16)> {
     match env.find_binary_or_literal(op) {
         Ok(interpreter::Expr::Function(f)) => {
-            let it = f.precedence.op_priority;
-            Some((Priority::new(it * 2), Priority::new(it * 2 + 1)))
+            let it = f.priority;
+            Some((it * 2, it * 2 + 1))
         }
         _ => None,
     }
 }
 
-fn prefix_binding_power(op: &str, env: &env::Env) -> ((), Priority) {
+fn prefix_binding_power(op: &str, env: &env::Env) -> ((), u16) {
     match env.find_unary_or_literal(op) {
         Ok(interpreter::Expr::Function(f)) => {
-            let it = f.precedence.op_priority;
-            ((), Priority::new(it * 2 + 1))
+            let it = f.priority;
+            ((), it * 2 + 1)
         }
         _ => panic!("bad op: {:?}", op),
     }
