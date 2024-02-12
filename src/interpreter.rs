@@ -24,6 +24,6 @@ impl Debug for Expr {
 }
 
 pub fn run(text: &str, env: &mut Env) -> Parsed<f64> {
-    let mut tks = parse(text)?;
+    let mut tks = parse(text, env)?;
     Ok(s::eval(&pratt::expr(&mut tks, env)))
 }

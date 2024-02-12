@@ -1,6 +1,7 @@
 use crate::env;
 use crate::function::Function;
 use crate::interpreter;
+use crate::interpreter::Expr;
 use crate::prioritize::Priority;
 use crate::s::S;
 use crate::token::Token;
@@ -22,8 +23,8 @@ fn pop_trailing_space<'a>(lexer: &mut Vec<Token<'a>>) -> Option<Token<'a>> {
 
 fn pop_spaced_infix<'a>(lexer: &mut Vec<Token<'a>>) {
     pop_trailing_space(lexer);
-    match lexer.last().map(|it|it.ttype) {
-        Some(TokenType::Literal(_)) => {},
+    match lexer.last().map(|it| it.ttype) {
+        Some(TokenType::Literal(_)) => {}
         _ => {
             lexer.pop();
             pop_trailing_space(lexer);
@@ -36,7 +37,11 @@ fn spaced_infix<'a>(lexer: &mut Vec<Token<'a>>) -> (u16, Option<Token<'a>>) {
     let pre_spaces = pre_space.map_or(0, |it| it.lexeme.len() as u16);
     let maybe_token = lexer.pop();
     let post_space = pop_trailing_space(lexer);
-    let post_spaces = post_space.map_or(0, |it| it.lexeme.len() as u16);
+    let mut post_spaces = post_space.map_or(0, |it| it.lexeme.len() as u16);
+    // Ignore ending spaces
+    if lexer.is_empty() {
+        post_spaces = 0;
+    }
     if let Some(t) = post_space {
         lexer.push(t);
     }
@@ -86,12 +91,18 @@ fn expr_bp(lexer: &mut Vec<Token>, env: &env::Env, min_binding: Priority) -> S {
             }
             // TODO: This assumes every name is of a unary prefix function.
             //       Functions with more args should be supported.
-            TokenType::Identifier => {
-                let ((), right) = prefix_binding_power(t.lexeme, env);
-                let spaces = pop_trailing_space(lexer).map_or(0, |it| it.lexeme.len() as u16);
-                let rhs = expr_bp(lexer, env, Priority { spaces, ..right });
-                S::Fun(get_prefix_by_name(t.lexeme, env), vec![rhs])
-            }
+            TokenType::Identifier => match env.find_unary_or_literal(t.lexeme) {
+                Ok(Expr::Function(_)) => {
+                    let ((), right) = prefix_binding_power(t.lexeme, env);
+                    let spaces = pop_trailing_space(lexer).map_or(0, |it| it.lexeme.len() as u16);
+                    let rhs = expr_bp(lexer, env, Priority { spaces, ..right });
+                    S::Fun(get_prefix_by_name(t.lexeme, env), vec![rhs])
+                }
+                Ok(Expr::Literal(n)) => S::Var(n),
+                bad => {
+                    panic!("{:?}", bad)
+                }
+            },
             _ => unreachable!("unexpected token {:?}, lexer state: {:?}", t.lexeme, lexer),
         },
         _ => unreachable!("empty lexer"),
@@ -161,7 +172,7 @@ mod test {
     use crate::parser;
 
     fn tokenize_and_parse(input: &str, expected: &str) {
-        let mut tokens = parser::parse(input).unwrap();
+        let mut tokens = parser::parse(input, &env::Env::prelude()).unwrap();
         let actual = expr(&mut tokens, &mut env::Env::prelude());
         assert_eq!(actual.to_string(), expected);
     }
@@ -224,5 +235,16 @@ mod test {
     fn _implied_multiplication_2() {
         tokenize_and_parse("2(+3+5)", "(* 2 (+ (+ 3) 5))");
         tokenize_and_parse("2 (+3+5)", "(* 2 (+ (+ 3) 5))");
+    }
+    #[test]
+    fn _cos_2pi() {
+        tokenize_and_parse("cos 2pi", "(cos (* 2 3.141592653589793))")
+    }
+    #[test]
+    fn _unary_ordering() {
+        tokenize_and_parse("cos2pi   ", "(cos (* 2 3.141592653589793))");//fail
+        tokenize_and_parse("cos 2pi  ", "(cos (* 2 3.141592653589793))");//fail
+        tokenize_and_parse("cos2 pi  ", "(* (cos 2) 3.141592653589793)");//ok
+        tokenize_and_parse("cos 2 pi ", "(cos (* 2 3.141592653589793))");//ok
     }
 }
