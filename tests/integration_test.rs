@@ -44,6 +44,9 @@ fn _reg_1() {
 
 #[test]
 fn _a() {
+    _test_run("6+1*9", 6. + 1. * 9.);
+    _test_run("6 + 1 * 9", 6. + 1. * 9.);
+    _test_run("5 + 6 + 1 * 9", 5. + 6. + 1. * 9.);
     _test_run(
         "2 ^ 4 * 5 + 6 + 1 ^ 9",
         2f64.powf(4.) * 5. + 6. + 1f64.powf(9.),
@@ -70,8 +73,19 @@ fn _run_with_spaces_4() {
 
 #[test]
 fn _implied_multiplication() {
+    _test_run("2(8)", 16.);
+    _test_run("(+3+5)", 8.);
+}
+
+#[test]
+fn _implied_multiplication_2() {
     _test_run("2(+3+5)", 16.);
     _test_run("2 (+3+5)", 16.);
+}
+
+#[test]
+fn _implied_multiplication_3() {
+    _test_run("2 3", 6.);
 }
 
 #[test]
@@ -94,10 +108,7 @@ fn _just_a_number() {
 
 #[test]
 fn _unmatched_parens() {
-    assert_eq!(
-        run("4)", &mut Env::prelude()),
-        Ok(4.)
-    );
+    assert_eq!(run("4)", &mut Env::prelude()), Ok(4.));
 }
 
 #[test]

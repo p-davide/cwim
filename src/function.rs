@@ -241,7 +241,7 @@ pub const ID: Function = Function {
     precedence: Priority {
         spaces: 0,
         parens: 0,
-        op_priority: (2),
+        op_priority: 6,
     },
 };
 

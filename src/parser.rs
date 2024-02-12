@@ -148,6 +148,23 @@ mod test {
     use super::*;
 
     #[test]
+    fn _z() {
+        let input = "2 (+3+5)";
+        let actual = parse(input).unwrap();
+        let expected = vec![
+            Token::lit(2., "2"),
+            Token::space(),
+            Token::lparen(),
+            Token::sym("+"),
+            Token::lit(3., "3"),
+            Token::sym("+"),
+            Token::lit(5., "5"),
+            Token::rparen(),
+        ];
+        assert_eq!(expected, actual);
+    }
+
+    #[test]
     fn _parse() {
         let actual = parse("234*5+7*8-18^3").map(|ts| ts.iter().map(|t| t.lexeme).collect());
         let expected: Parsed<Vec<Token>> = Ok(vec![
