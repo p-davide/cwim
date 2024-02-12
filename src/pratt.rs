@@ -7,6 +7,8 @@ use crate::s::S;
 use crate::token::Token;
 use crate::token::TokenType;
 
+// Modified from https://github.com/matklad/minipratt
+
 pub fn expr(lexer: &mut Vec<Token>, env: &env::Env) -> S {
     lexer.reverse();
     pop_trailing_space(lexer);
