@@ -2,6 +2,7 @@ use crate::env::Env;
 use crate::function::*;
 use crate::parser::*;
 use crate::pratt;
+use crate::s;
 use std::fmt::Debug;
 use std::fmt::Formatter;
 
@@ -24,5 +25,5 @@ impl Debug for Expr {
 
 pub fn run(text: &str, env: &mut Env) -> Parsed<f64> {
     let mut tks = parse(text)?;
-    Ok(pratt::eval(&pratt::expr(&mut tks, env)))
+    Ok(s::eval(&pratt::expr(&mut tks, env)))
 }
