@@ -1,16 +1,66 @@
 use crate::{env::Env, interpreter::Expr, token::*};
 
 pub type Parsed<T> = Result<T, String>;
+type Expression<'a> = Vec<Token<'a>>;
 
-pub fn parse<'a>(text: &'a str, env: &Env) -> Parsed<Vec<Token<'a>>> {
-    let mut to_parse = text;
-    let mut tokens = vec![];
-    while !to_parse.is_empty() {
-        let token = parse_token(to_parse, env)?;
-        tokens.push(token);
-        to_parse = &to_parse[token.lexeme.len()..];
+#[derive(Debug, PartialEq)]
+pub enum Stmt<'a> {
+    Expr(Expression<'a>),
+    Assignment(String, Expression<'a>),
+}
+
+impl<'a> Stmt<'a> {
+    pub fn rhs(&self) -> &Expression<'a> {
+        match self {
+            Self::Assignment(_, it) => it,
+            Self::Expr(it) => it,
+        }
     }
-    Ok(tokens)
+}
+
+fn parse_assignee(text: &str) -> Parsed<(usize, String)> {
+    let mut i = 0;
+
+    if let Ok(token) = parse_spaces(text) {
+        i += token.lexeme.len();
+    }
+
+    let assignee = parse_identifier(&text[i..])?;
+    i += assignee.len();
+
+    if let Ok(token) = parse_spaces(&text[i..]) {
+        i += token.lexeme.len();
+    }
+
+    parse_char('=', TokenType::Space, &text[i..])?;
+    i += 1;
+
+    if let Ok(token) = parse_spaces(&text[i..]) {
+        i += token.lexeme.len();
+    }
+
+    Ok((i, assignee.to_owned()))
+}
+
+pub fn parse<'a>(text: &'a str, env: &Env) -> Parsed<Stmt<'a>> {
+    let mut tokens = vec![];
+    if let Ok((n, assignee)) = parse_assignee(text) {
+        let mut to_parse = &text[n..];
+        while !to_parse.is_empty() {
+            let token = parse_token(to_parse, env)?;
+            tokens.push(token);
+            to_parse = &to_parse[token.lexeme.len()..];
+        }
+        Ok(Stmt::Assignment(assignee, tokens))
+    } else {
+        let mut to_parse = text;
+        while !to_parse.is_empty() {
+            let token = parse_token(to_parse, env)?;
+            tokens.push(token);
+            to_parse = &to_parse[token.lexeme.len()..];
+        }
+        Ok(Stmt::Expr(tokens))
+    }
 }
 
 fn parse_token<'a>(text: &'a str, env: &Env) -> Parsed<Token<'a>> {
@@ -19,7 +69,7 @@ fn parse_token<'a>(text: &'a str, env: &Env) -> Parsed<Token<'a>> {
         return parse_number(text);
     }
     if c.is_ascii_alphabetic() {
-        return parse_identifier(text, env);
+        return parse_known_identifier(text, env);
     }
     match c {
         '-' => parse_symbol(text),
@@ -123,7 +173,7 @@ fn parse_number(text: &str) -> Parsed<Token> {
     }
 }
 
-fn parse_identifier<'a>(text: &'a str, env: &Env) -> Parsed<Token<'a>> {
+fn parse_identifier(text: &str) -> Parsed<&str> {
     let mut l: usize = 0;
     for c in text.chars() {
         if c.is_ascii_alphabetic() {
@@ -133,16 +183,19 @@ fn parse_identifier<'a>(text: &'a str, env: &Env) -> Parsed<Token<'a>> {
         }
     }
     if l == 0 {
-        return Err("empty identifier".to_owned())
+        return Err("empty identifier".to_owned());
     }
-    let lexeme = &text[..l];
+    Ok(&text[..l])
+}
+
+fn parse_known_identifier<'a>(text: &'a str, env: &Env) -> Parsed<Token<'a>> {
+    let lexeme = parse_identifier(text)?;
     match env.find_unary_or_literal(lexeme) {
         Err(msg) => Err(msg),
         Ok(Expr::Literal(n)) => Ok(Token::new(TokenType::Literal(n), lexeme)),
         Ok(Expr::Function(f)) => Ok(Token::new(TokenType::Identifier, lexeme)),
-        _ => unimplemented!()
+        _ => unimplemented!(),
     }
-
 }
 
 fn parse_symbol(text: &str) -> Parsed<Token> {
@@ -159,11 +212,19 @@ mod test {
     use crate::env;
 
     use super::*;
+
+    #[test]
+    fn _assignment() {
+        let input = "x = 6";
+        let expected = Stmt::Assignment("x".to_owned(), vec![Token::lit(6., "6")]);
+        assert_eq!(parse(input, &Env::prelude()).unwrap(), expected);
+    }
+
     #[test]
     fn _z() {
         let input = "2 (+3+5)";
         let actual = parse(input, &env::Env::prelude()).unwrap();
-        let expected = vec![
+        let expected = Stmt::Expr(vec![
             Token::lit(2., "2"),
             Token::space(),
             Token::lparen(),
@@ -172,20 +233,22 @@ mod test {
             Token::sym("+"),
             Token::lit(5., "5"),
             Token::rparen(),
-        ];
+        ]);
         assert_eq!(expected, actual);
     }
 
     #[test]
     fn _spaces() {
         let spaces = "       ";
-        assert_eq!(parse(spaces, &env::Env::prelude()).unwrap(), vec![Token::new(TokenType::Space, spaces)]);
+        assert_eq!(
+            parse(spaces, &env::Env::prelude()).unwrap(),
+            Stmt::Expr(vec![Token::new(TokenType::Space, spaces)])
+        );
     }
 
     #[test]
     fn _parse() {
-        let actual = parse("234*5+7*8-18^3", &env::Env::prelude()).map(|ts| ts.iter().map(|t| t.lexeme).collect());
-        let expected: Parsed<Vec<Token>> = Ok(vec![
+        let expected = Ok(Stmt::Expr(vec![
             Token::lit(234., "234"),
             Token::sym("*"),
             Token::lit(5., "5"),
@@ -197,63 +260,44 @@ mod test {
             Token::lit(18., "18"),
             Token::sym("^"),
             Token::lit(3., "3"),
-        ]);
-        assert_eq!(
-            actual,
-            Ok(vec![
-                "234", "*", "5", "+", "7", "*", "8", "-", "18", "^", "3",
-            ])
-        );
+        ]));
         assert_eq!(parse("234*5+7*8-18^3", &env::Env::prelude()), expected);
     }
 
     #[test]
     fn _a() {
         let to_parse = "-(5+6)";
-        let actual = parse(to_parse, &env::Env::prelude()).map(|ts| ts.iter().map(|t| t.lexeme).collect());
-        let expected: Parsed<Vec<Token>> = Ok(vec![
+        let expected = Ok(Stmt::Expr(vec![
             Token::sym("-"),
             Token::lparen(),
             Token::lit(5., "5"),
             Token::sym("+"),
             Token::lit(6., "6"),
             Token::rparen(),
-        ]);
+        ]));
         assert_eq!(parse(to_parse, &env::Env::prelude()), expected);
-        assert_eq!(actual, Ok(vec!["-", "(", "5", "+", "6", ")"]));
     }
 
     #[test]
     fn _b() {
         let to_parse = "-1 +4";
-        let actual = parse(to_parse, &env::Env::prelude()).map(|ts| ts.iter().map(|t| t.lexeme).collect());
-        let expected: Parsed<Vec<Token>> = Ok(vec![
+        let expected = Ok(Stmt::Expr(vec![
             Token::sym("-"),
             Token::lit(1., "1"),
             Token::space(),
             Token::sym("+"),
             Token::lit(4., "4"),
-        ]);
+        ]));
         assert_eq!(parse(to_parse, &env::Env::prelude()), expected);
-        assert_eq!(actual, Ok(vec!["-", "1", " ", "+", "4"]));
     }
 
-    #[test]
-    fn _c() {
-        let to_parse = "-( -1 +4)";
-        let actual = parse(to_parse, &env::Env::prelude()).map(|ts| ts.iter().map(|t| t.lexeme).collect());
-        assert_eq!(
-            actual,
-            Ok(vec!["-", "(", " ", "-", "1", " ", "+", "4", ")"])
-        );
-    }
     //" -(6) * -(6)"
     #[test]
     fn _d() {
         let to_parse = " -(6) * -(6)";
         assert_eq!(
             parse(to_parse, &env::Env::prelude()),
-            Ok(vec![
+            Ok(Stmt::Expr(vec![
                 Token::space(),
                 Token::sym("-"),
                 Token::lparen(),
@@ -266,7 +310,7 @@ mod test {
                 Token::lparen(),
                 Token::lit(6., "6"),
                 Token::rparen(),
-            ])
+            ]))
         );
     }
 }

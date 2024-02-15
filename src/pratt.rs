@@ -24,7 +24,7 @@ fn pop_trailing_space<'a>(lexer: &mut Vec<Token<'a>>) -> Option<Token<'a>> {
     }
 }
 
-fn pop_spaced_infix<'a>(lexer: &mut Vec<Token<'a>>) {
+fn pop_spaced_infix(lexer: &mut Vec<Token>) {
     pop_trailing_space(lexer);
     match lexer.last().map(|it| it.ttype) {
         Some(TokenType::Literal(_)) => {}
@@ -209,12 +209,17 @@ fn prefix_binding_power(op: &str, env: &env::Env) -> ((), u16) {
 #[cfg(test)]
 mod test {
     use super::*;
-    use crate::parser;
+    use crate::parser::{self, Stmt};
 
     fn tokenize_and_parse(input: &str, expected: &str) {
-        let mut tokens = parser::parse(input, &env::Env::prelude()).unwrap();
-        let actual = expr(&mut tokens, &mut env::Env::prelude());
-        assert_eq!(actual.to_string(), expected);
+        let stmt = parser::parse(input, &env::Env::prelude()).unwrap();
+        match stmt {
+            Stmt::Expr(mut tokens) => {
+                let actual = expr(&mut tokens, &mut env::Env::prelude());
+                assert_eq!(actual.to_string(), expected);
+            }
+            _ => panic!("expected expression"),
+        }
     }
     #[test]
     fn _a() {

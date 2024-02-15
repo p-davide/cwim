@@ -34,7 +34,7 @@ mod test {
     use crate::{
         env,
         function::{ADD, ID, MUL},
-        parser,
+        parser::{self, Stmt},
         pratt::expr,
     };
 
@@ -49,10 +49,14 @@ mod test {
                 S::Fun(ADD, vec![S::Fun(ID, vec![S::Var(3.)]), S::Var(5.)]),
             ],
         );
-        let mut tokens = parser::parse("2(+3+5)", &env::Env::prelude()).unwrap();
-        let actual = expr(&mut tokens, &mut env::Env::prelude());
-
-        assert_eq!(expected, actual);
-        assert_eq!(eval(&expected), eval(&actual));
+        let stmt = parser::parse("2(+3+5)", &env::Env::prelude()).unwrap();
+        match stmt {
+            Stmt::Expr(mut tokens) => {
+                let actual = expr(&mut tokens, &mut env::Env::prelude());
+                assert_eq!(expected, actual);
+                assert_eq!(eval(&expected), eval(&actual));
+            }
+            _ => panic!(),
+        }
     }
 }

@@ -7,10 +7,10 @@ use rustyline::error::ReadlineError;
 use rustyline::{DefaultEditor, Result};
 
 fn run_line(line: &str, env: &mut Env) {
-    match run(&line, env) {
+    match run(line, env) {
         Ok(result) => {
             println!("{}", result);
-            env.assign("ans".to_owned(), Variable::Value(result));
+            env.assign("ans".to_owned(), result);
         }
         Err(msg) => eprintln!("{}", msg),
     }
@@ -50,7 +50,7 @@ fn repl() -> Result<()> {
 fn main() {
     let stdin = io::stdin();
     if stdin.is_terminal() {
-        repl();
+        let _ = repl();
     } else {
         let mut env = Env::prelude();
         for line in stdin.lines() {

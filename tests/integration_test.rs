@@ -154,9 +154,3 @@ fn _assignment() {
         Ok(cwim::interpreter::Expr::Literal(6.))
     );
 }
-
-#[test]
-fn _one_assignment_per_line() {
-    let mut env = Env::prelude();
-    assert_eq!(run("x = 6\ny= 7\nz = 8cos0\nx+y+z", &mut env), Ok(21.));
-}

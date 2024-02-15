@@ -197,9 +197,3 @@ pub const POW: Function = Function {
     priority: 7,
 };
 
-pub const ASSIGN: Function = Function {
-    name: "=",
-    arity: 2,
-    f: |xs| xs[0],
-    priority: (0),
-};

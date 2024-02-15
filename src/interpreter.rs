@@ -24,6 +24,15 @@ impl Debug for Expr {
 }
 
 pub fn run(text: &str, env: &mut Env) -> Parsed<f64> {
-    let mut tks = parse(text, env)?;
-    Ok(s::eval(&pratt::expr(&mut tks, env)))
+    let tks = parse(text, env)?;
+    match tks {
+        Stmt::Expr(mut tks) => Ok(s::eval(&pratt::expr(&mut tks, env))),
+        Stmt::Assignment(name, mut expr) => {
+            let result = s::eval(&pratt::expr(&mut expr, env));
+            match env.assign(name, result) {
+                Some(_) => Err("already exists".to_owned()),
+                None => Ok(result),
+            }
+        }
+    }
 }

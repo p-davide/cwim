@@ -48,7 +48,6 @@ impl Env {
     pub fn prelude() -> Self {
         Self {
             inner: std::collections::HashMap::from([
-                binary("=", ASSIGN),
                 (
                     "+".to_owned(),
                     Variable::Function(Functions {
@@ -131,7 +130,7 @@ impl Env {
         }
     }
 
-    pub fn assign(&mut self, lhs: String, rhs: Variable) -> Option<Variable> {
-        self.inner.insert(lhs, rhs)
+    pub fn assign(&mut self, lhs: String, rhs: f64) -> Option<Variable> {
+        self.inner.insert(lhs, Variable::Value(rhs))
     }
 }
