@@ -31,15 +31,14 @@ fn repl() -> Result<()> {
                 run_line(&line, &mut env);
             }
             Err(ReadlineError::Interrupted) => {
-                println!("CTRL-C");
+                eprintln!("Interrupted");
                 break;
             }
             Err(ReadlineError::Eof) => {
-                println!("CTRL-D");
                 break;
             }
             Err(err) => {
-                println!("Error: {:?}", err);
+                eprintln!("Error: {:?}", err);
                 break;
             }
         }
