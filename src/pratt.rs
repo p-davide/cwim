@@ -1,5 +1,6 @@
 use crate::env;
 use crate::function::Function;
+use crate::function::MUL;
 use crate::interpreter;
 use crate::interpreter::Expr;
 use crate::prioritize::Priority;
@@ -77,7 +78,14 @@ fn expr_bp(lexer: &mut Vec<Token>, env: &env::Env, min_binding: Priority) -> S {
             TokenType::Symbol => {
                 let ((), right) = prefix_binding_power(t.lexeme, env);
                 let spaces = pop_trailing_space(lexer).map_or(0, |it| it.lexeme.len() as u16);
-                let rhs = expr_bp(lexer, env, Priority { spaces, op_priority: right });
+                let rhs = expr_bp(
+                    lexer,
+                    env,
+                    Priority {
+                        spaces,
+                        op_priority: right,
+                    },
+                );
                 S::Fun(get_prefix_by_name(t.lexeme, env), vec![rhs])
             }
             TokenType::LParen => {
@@ -97,7 +105,14 @@ fn expr_bp(lexer: &mut Vec<Token>, env: &env::Env, min_binding: Priority) -> S {
                 Ok(Expr::Function(_)) => {
                     let ((), right) = prefix_binding_power(t.lexeme, env);
                     let spaces = pop_trailing_space(lexer).map_or(0, |it| it.lexeme.len() as u16);
-                    let rhs = expr_bp(lexer, env, Priority { spaces, op_priority: right });
+                    let rhs = expr_bp(
+                        lexer,
+                        env,
+                        Priority {
+                            spaces,
+                            op_priority: right,
+                        },
+                    );
                     S::Fun(get_prefix_by_name(t.lexeme, env), vec![rhs])
                 }
                 Ok(Expr::Literal(n)) => S::Var(n),
@@ -121,13 +136,36 @@ fn expr_bp(lexer: &mut Vec<Token>, env: &env::Env, min_binding: Priority) -> S {
                     // We treat this as a multiplication.
                     TokenType::LParen => (0xffff, "*"),
                     TokenType::Literal(_) => (spaces, "*"),
+                    TokenType::Identifier => match env.find_unary_or_literal(t.lexeme) {
+                        Ok(Expr::Function(_)) => {
+                            let ((), right) = prefix_binding_power(t.lexeme, env);
+                            let spaces =
+                                pop_trailing_space(lexer).map_or(0, |it| it.lexeme.len() as u16);
+                            let rhs = expr_bp(
+                                lexer,
+                                env,
+                                Priority {
+                                    spaces,
+                                    op_priority: right,
+                                },
+                            );
+                            return S::Fun(MUL, vec![lhs, rhs]);
+                        }
+                        Ok(Expr::Literal(n)) => return S::Var(n),
+                        bad => {
+                            panic!("{:?}", bad)
+                        }
+                    },
                     t => unreachable!("{:?} with lexer state {:?}", t, lexer),
                 }
             }
         };
 
         if let Some((left, right)) = infix_binding_power(op, env) {
-            let op_priority = Priority { spaces, op_priority: left };
+            let op_priority = Priority {
+                spaces,
+                op_priority: left,
+            };
             if op_priority < min_binding {
                 break;
             }
@@ -137,7 +175,7 @@ fn expr_bp(lexer: &mut Vec<Token>, env: &env::Env, min_binding: Priority) -> S {
                 env,
                 Priority {
                     spaces: std::cmp::min(min_binding.spaces, spaces),
-                    op_priority: right
+                    op_priority: right,
                 },
             );
             lhs = S::Fun(get_infix_by_name(op, env), vec![lhs, rhs]);
@@ -244,9 +282,13 @@ mod test {
     }
     #[test]
     fn _unary_ordering() {
-        tokenize_and_parse("cos2pi   ", "(cos (* 2 3.141592653589793))");//fail
-        tokenize_and_parse("cos 2pi  ", "(cos (* 2 3.141592653589793))");//fail
-        tokenize_and_parse("cos2 pi  ", "(* (cos 2) 3.141592653589793)");//ok
-        tokenize_and_parse("cos 2 pi ", "(cos (* 2 3.141592653589793))");//ok
+        tokenize_and_parse("cos2pi   ", "(cos (* 2 3.141592653589793))");
+        tokenize_and_parse("cos 2pi  ", "(cos (* 2 3.141592653589793))");
+        tokenize_and_parse("cos2 pi  ", "(* (cos 2) 3.141592653589793)");
+        tokenize_and_parse("cos 2 pi ", "(cos (* 2 3.141592653589793))");
+    }
+    #[test]
+    fn _n() {
+        tokenize_and_parse("4 log100", "(* 4 (log 100))")
     }
 }
