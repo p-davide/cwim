@@ -78,9 +78,16 @@ fn get_prefix_by_name<N: Real>(name: &str, env: &env::Env<N>) -> Function<N> {
 fn expr_bp<N: Real + std::fmt::Debug+ std::str::FromStr>(lexer: &mut Vec<Token>, env: &env::Env<N>, min_binding: Priority) -> S<N> {
     let mut lhs = match lexer.pop() {
         Some(t) => match t.ttype {
-            TokenType::Literal => S::Var(match t.lexeme.parse::<N>() {
-                Err(_) => panic!(),
-                Ok(n) => n
+            // TODO: This is very janky.
+            TokenType::Literal => S::Var(if let Ok(n) = t.lexeme.parse::<N>(){
+                n
+            } else if let Ok(n) = env.find_value(t.lexeme) {
+                match n {
+                    Expr::Literal(n) => n,
+                    _ => panic!("{}", t.lexeme),
+                }
+            } else {
+                panic!("{}", t.lexeme)
             }),
             TokenType::Symbol => {
                 let ((), right) = prefix_binding_power(t.lexeme, env);

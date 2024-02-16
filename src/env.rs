@@ -1,5 +1,5 @@
 use num_traits::real::Real;
-use num_traits::Num;
+use num_traits::{Num, One};
 
 use crate::function::*;
 use crate::interpreter::Expr;
@@ -43,7 +43,7 @@ fn unary<N>(symbol: &'static str, f: Function<N>) -> (String, Variable<N>) {
     (symbol.to_owned(), Variable::Function(Functions::unary(f)))
 }
 
-fn value<N>(symbol: &'static str, n: N) -> (String, Variable<N>) {
+fn value<N: Real>(symbol: &'static str, n: N) -> (String, Variable<N>) {
     (symbol.to_owned(), Variable::Value(n))
 }
 
@@ -71,7 +71,7 @@ impl<N: Num + Real> Env<N> {
                 binary("%", REM()),
                 unary("sqrt", SQRT()),
                 unary("cbrt", CBRT()),
-                //value("pi", std::f64::consts::PI),
+                value("pi", (ACOS().f)(vec![-N::one()])),
                 unary("cos", COS()),
                 unary("sin", SIN()),
                 unary("tan", TAN()),
