@@ -1,100 +1,103 @@
+use num_traits::real::Real;
+use num_traits::Num;
+
 use crate::function::*;
 use crate::interpreter::Expr;
 use crate::parser::Parsed;
 
 #[derive(Debug)]
-pub enum Variable {
-    Function(Functions),
-    Value(f64),
+pub enum Variable<N> {
+    Function(Functions<N>),
+    Value(N),
 }
 
 #[derive(Debug)]
-pub struct Functions {
-    pub unary: Option<Function>,
-    pub binary: Option<Function>,
+pub struct Functions<N> {
+    pub unary: Option<Function<N>>,
+    pub binary: Option<Function<N>>,
 }
 
-impl Functions {
-    fn unary(unary: Function) -> Self {
+impl<N> Functions<N> {
+    fn unary(unary: Function<N>) -> Self {
         Self {
             unary: Some(unary),
             binary: None,
         }
     }
-    fn binary(binary: Function) -> Self {
+    fn binary(binary: Function<N>) -> Self {
         Self {
             binary: Some(binary),
             unary: None,
         }
     }
 }
-pub struct Env {
-    inner: std::collections::HashMap<String, Variable>,
+pub struct Env<N> {
+    inner: std::collections::HashMap<String, Variable<N>>,
 }
 
-fn binary(symbol: &'static str, f: Function) -> (String, Variable) {
+fn binary<N>(symbol: &'static str, f: Function<N>) -> (String, Variable<N>) {
     (symbol.to_owned(), Variable::Function(Functions::binary(f)))
 }
 
-fn unary(symbol: &'static str, f: Function) -> (String, Variable) {
+fn unary<N>(symbol: &'static str, f: Function<N>) -> (String, Variable<N>) {
     (symbol.to_owned(), Variable::Function(Functions::unary(f)))
 }
 
-fn value(symbol: &'static str, n: f64) -> (String, Variable) {
+fn value<N>(symbol: &'static str, n: N) -> (String, Variable<N>) {
     (symbol.to_owned(), Variable::Value(n))
 }
 
-impl Env {
+impl<N: Num + Real> Env<N> {
     pub fn prelude() -> Self {
         Self {
             inner: std::collections::HashMap::from([
                 (
                     "+".to_owned(),
                     Variable::Function(Functions {
-                        unary: Some(ID),
-                        binary: Some(ADD),
+                        unary: Some(ID()),
+                        binary: Some(ADD()),
                     }),
                 ),
                 (
                     "-".to_owned(),
                     Variable::Function(Functions {
-                        unary: Some(NEG),
-                        binary: Some(SUB),
+                        unary: Some(NEG()),
+                        binary: Some(SUB()),
                     }),
                 ),
-                binary("*", MUL),
-                binary("/", DIV),
-                binary("^", POW),
-                binary("%", REM),
-                unary("sqrt", SQRT),
-                unary("cbrt", CBRT),
-                value("pi", std::f64::consts::PI),
-                unary("cos", COS),
-                unary("sin", SIN),
-                unary("tan", TAN),
-                unary("exp", EXP),
-                unary("ln", LN),
-                unary("log", LOG),
-                unary("acos", ACOS),
-                unary("asin", ASIN),
-                unary("atan", ATAN),
-                unary("arccos", ACOS),
-                unary("arcsin", ASIN),
-                unary("arctan", ATAN),
-                unary("cosh", COSH),
-                unary("sinh", SINH),
-                unary("tanh", TANH),
-                unary("acosh", ACOSH),
-                unary("asinh", ASINH),
-                unary("atanh", ATANH),
-                unary("arccosh", ACOSH),
-                unary("arcsinh", ASINH),
-                unary("arctanh", ATANH),
+                binary("*", MUL()),
+                binary("/", DIV()),
+                binary("^", POW()),
+                binary("%", REM()),
+                unary("sqrt", SQRT()),
+                unary("cbrt", CBRT()),
+                //value("pi", std::f64::consts::PI),
+                unary("cos", COS()),
+                unary("sin", SIN()),
+                unary("tan", TAN()),
+                unary("exp", EXP()),
+                unary("ln", LN()),
+                unary("log", LOG()),
+                unary("acos", ACOS()),
+                unary("asin", ASIN()),
+                unary("atan", ATAN()),
+                unary("arccos", ACOS()),
+                unary("arcsin", ASIN()),
+                unary("arctan", ATAN()),
+                unary("cosh", COSH()),
+                unary("sinh", SINH()),
+                unary("tanh", TANH()),
+                unary("acosh", ACOSH()),
+                unary("asinh", ASINH()),
+                unary("atanh", ATANH()),
+                unary("arccosh", ACOSH()),
+                unary("arcsinh", ASINH()),
+                unary("arctanh", ATANH()),
             ]),
         }
     }
 
-    pub fn find_value(&self, l: &str) -> Parsed<Expr> {
+    pub fn find_value(&self, l: &str) -> Parsed<Expr<N>> {
         let var = self.inner.get(l);
         match var {
             Some(Variable::Value(n)) => Ok(Expr::Literal(*n)),
@@ -106,7 +109,7 @@ impl Env {
         }
     }
 
-    pub fn find_unary_or_literal(&self, l: &str) -> Parsed<Expr> {
+    pub fn find_unary_or_literal(&self, l: &str) -> Parsed<Expr<N>> {
         let var = self.inner.get(l);
         match var {
             Some(Variable::Function(Functions {
@@ -118,7 +121,7 @@ impl Env {
         }
     }
 
-    pub fn find_binary_or_literal(&self, l: &str) -> Parsed<Expr> {
+    pub fn find_binary_or_literal(&self, l: &str) -> Parsed<Expr<N>> {
         let var = self.inner.get(l);
         match var {
             Some(Variable::Function(Functions {
@@ -130,7 +133,7 @@ impl Env {
         }
     }
 
-    pub fn assign(&mut self, lhs: String, rhs: f64) -> Option<Variable> {
+    pub fn assign(&mut self, lhs: String, rhs: N) -> Option<Variable<N>> {
         self.inner.insert(lhs, Variable::Value(rhs))
     }
 }

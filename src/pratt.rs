@@ -1,3 +1,7 @@
+use std::str::FromStr;
+
+use num_traits::real::Real;
+
 use crate::env;
 use crate::function::Function;
 use crate::function::MUL;
@@ -10,7 +14,7 @@ use crate::token::TokenType;
 
 // Modified from https://github.com/matklad/minipratt
 
-pub fn expr(lexer: &mut Vec<Token>, env: &env::Env) -> S {
+pub fn expr<N: PartialEq + Real + std::fmt::Debug + FromStr>(lexer: &mut Vec<Token>, env: &env::Env<N>) -> S<N> {
     lexer.reverse();
     pop_trailing_space(lexer);
     expr_bp(lexer, env, Priority::min())
@@ -27,7 +31,7 @@ fn pop_trailing_space<'a>(lexer: &mut Vec<Token<'a>>) -> Option<Token<'a>> {
 fn pop_spaced_infix(lexer: &mut Vec<Token>) {
     pop_trailing_space(lexer);
     match lexer.last().map(|it| it.ttype) {
-        Some(TokenType::Literal(_)) => {}
+        Some(TokenType::Literal) => {}
         _ => {
             lexer.pop();
             pop_trailing_space(lexer);
@@ -57,24 +61,27 @@ fn spaced_infix<'a>(lexer: &mut Vec<Token<'a>>) -> (u16, Option<Token<'a>>) {
     (std::cmp::max(pre_spaces, post_spaces), maybe_token)
 }
 
-fn get_infix_by_name(name: &str, env: &env::Env) -> Function {
+fn get_infix_by_name<N: Real>(name: &str, env: &env::Env<N>) -> Function<N> {
     match env.find_binary_or_literal(name) {
         Ok(interpreter::Expr::Function(f)) => f,
         _ => panic!("Unary {} not found", name),
     }
 }
 
-fn get_prefix_by_name(name: &str, env: &env::Env) -> Function {
+fn get_prefix_by_name<N: Real>(name: &str, env: &env::Env<N>) -> Function<N> {
     match env.find_unary_or_literal(name) {
         Ok(interpreter::Expr::Function(f)) => f,
         _ => panic!("Unary {} not found", name),
     }
 }
 
-fn expr_bp(lexer: &mut Vec<Token>, env: &env::Env, min_binding: Priority) -> S {
+fn expr_bp<N: Real + std::fmt::Debug+ std::str::FromStr>(lexer: &mut Vec<Token>, env: &env::Env<N>, min_binding: Priority) -> S<N> {
     let mut lhs = match lexer.pop() {
         Some(t) => match t.ttype {
-            TokenType::Literal(n) => S::Var(n),
+            TokenType::Literal => S::Var(match t.lexeme.parse::<N>() {
+                Err(_) => panic!(),
+                Ok(n) => n
+            }),
             TokenType::Symbol => {
                 let ((), right) = prefix_binding_power(t.lexeme, env);
                 let spaces = pop_trailing_space(lexer).map_or(0, |it| it.lexeme.len() as u16);
@@ -135,7 +142,7 @@ fn expr_bp(lexer: &mut Vec<Token>, env: &env::Env, min_binding: Priority) -> S {
                     // Finding a ( here instead of an operator means the expression is like ...2(3+...
                     // We treat this as a multiplication.
                     TokenType::LParen => (0xffff, "*"),
-                    TokenType::Literal(_) => (spaces, "*"),
+                    TokenType::Literal => (spaces, "*"),
                     TokenType::Identifier => match env.find_unary_or_literal(t.lexeme) {
                         Ok(Expr::Function(_)) => {
                             let ((), right) = prefix_binding_power(t.lexeme, env);
@@ -149,7 +156,7 @@ fn expr_bp(lexer: &mut Vec<Token>, env: &env::Env, min_binding: Priority) -> S {
                                     op_priority: right,
                                 },
                             );
-                            return S::Fun(MUL, vec![lhs, rhs]);
+                            return S::Fun(MUL(), vec![lhs, rhs]);
                         }
                         Ok(Expr::Literal(n)) => return S::Var(n),
                         bad => {
@@ -186,7 +193,7 @@ fn expr_bp(lexer: &mut Vec<Token>, env: &env::Env, min_binding: Priority) -> S {
     lhs
 }
 
-fn infix_binding_power(op: &str, env: &env::Env) -> Option<(u16, u16)> {
+fn infix_binding_power<N: Real>(op: &str, env: &env::Env<N>) -> Option<(u16, u16)> {
     match env.find_binary_or_literal(op) {
         Ok(interpreter::Expr::Function(f)) => {
             let it = f.priority;
@@ -196,7 +203,7 @@ fn infix_binding_power(op: &str, env: &env::Env) -> Option<(u16, u16)> {
     }
 }
 
-fn prefix_binding_power(op: &str, env: &env::Env) -> ((), u16) {
+fn prefix_binding_power<N: Real>(op: &str, env: &env::Env<N>) -> ((), u16) {
     match env.find_unary_or_literal(op) {
         Ok(interpreter::Expr::Function(f)) => {
             let it = f.priority;
@@ -212,10 +219,10 @@ mod test {
     use crate::parser::{self, Stmt};
 
     fn tokenize_and_parse(input: &str, expected: &str) {
-        let stmt = parser::parse(input, &env::Env::prelude()).unwrap();
+        let stmt = parser::parse(input, &env::Env::<f64>::prelude()).unwrap();
         match stmt {
             Stmt::Expr(mut tokens) => {
-                let actual = expr(&mut tokens, &mut env::Env::prelude());
+                let actual: S<f64> = expr(&mut tokens, &mut env::Env::prelude());
                 assert_eq!(actual.to_string(), expected);
             }
             _ => panic!("expected expression"),

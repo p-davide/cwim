@@ -1,6 +1,6 @@
 #[derive(PartialEq, Debug, Copy, Clone)]
 pub enum TokenType {
-    Literal(f64),
+    Literal,
     Identifier,
     Symbol,
     Space,
@@ -26,8 +26,8 @@ impl<'t> Token<'t> {
         Self { ttype, lexeme }
     }
 
-    pub fn lit(lit: f64, lexeme: &'t str) -> Self {
-        Self::new(TokenType::Literal(lit), lexeme)
+    pub fn lit(lexeme: &'t str) -> Self {
+        Self::new(TokenType::Literal, lexeme)
     }
 
     pub fn sym(lexeme: &'t str) -> Self {

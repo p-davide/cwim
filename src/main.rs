@@ -1,12 +1,18 @@
+use std::fmt::Display;
 use std::io;
 use std::io::IsTerminal;
+use std::str::FromStr;
 
 use cwim::env::*;
 use cwim::interpreter::*;
+use num_traits::real::Real;
 use rustyline::error::ReadlineError;
 use rustyline::{DefaultEditor, Result};
 
-fn run_line(line: &str, env: &mut Env) {
+fn run_line<N: Display + Real + std::fmt::Debug + FromStr>(line: &str, env: &mut Env<N>)
+where
+    <N as FromStr>::Err: std::fmt::Debug,
+{
     match run(line, env) {
         Ok(result) => {
             println!("{}", result);
@@ -16,8 +22,9 @@ fn run_line(line: &str, env: &mut Env) {
     }
 }
 
-fn repl() -> Result<()> {
-    let mut env = Env::prelude();
+fn repl<N: Display + Real + std::fmt::Debug + FromStr>() -> Result<()> where
+    <N as FromStr>::Err: std::fmt::Debug,{
+    let mut env = Env::<N>::prelude();
     let mut rl = DefaultEditor::new()?;
     #[cfg(feature = "with-file-history")]
     if rl.load_history("history.txt").is_err() {
@@ -49,9 +56,9 @@ fn repl() -> Result<()> {
 fn main() {
     let stdin = io::stdin();
     if stdin.is_terminal() {
-        let _ = repl();
+        let _ = repl::<f64>();
     } else {
-        let mut env = Env::prelude();
+        let mut env = Env::<f64>::prelude();
         for line in stdin.lines() {
             run_line(&line.expect("no line found"), &mut env);
         }

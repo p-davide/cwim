@@ -1,7 +1,7 @@
 use cwim::env::*;
 use cwim::interpreter::run;
 fn _test_run(text: &str, expected: f64) {
-    assert_eq!(run(text, &mut Env::prelude()), Ok(expected));
+    assert_eq!(run(text, &mut Env::<f64>::prelude()), Ok(expected));
 }
 
 #[test]
@@ -108,7 +108,7 @@ fn _just_a_number() {
 
 #[test]
 fn _unmatched_parens() {
-    assert_eq!(run("4)", &mut Env::prelude()), Ok(4.));
+    assert_eq!(run("4)", &mut Env::<f64>::prelude()), Ok(4.));
 }
 
 #[test]
@@ -130,24 +130,24 @@ fn _double_unary() {
     _test_run("cos(cos 2-2)", (1 as f64).cos());
     _test_run("cos(cos(2-2))", (1 as f64).cos());
     assert_eq!(
-        1. - run("acos(cos(3-2))", &mut Env::prelude()).unwrap() < std::f64::EPSILON,
+        1. - run("acos(cos(3-2))", &mut Env::<f64>::prelude()).unwrap() < std::f64::EPSILON,
         true
     );
     assert_eq!(
-        1. - run("acosh cosh(3-2)", &mut Env::prelude()).unwrap() < std::f64::EPSILON,
+        1. - run("acosh cosh(3-2)", &mut Env::<f64>::prelude()).unwrap() < std::f64::EPSILON,
         true
     );
 }
 
 #[test]
 fn _1st_deg_poly() {
-    assert_eq!(run("7x", &mut Env::prelude()).is_err(), true)
+    assert_eq!(run("7x", &mut Env::<f64>::prelude()).is_err(), true)
 }
 
 // TODO: Test assignments more.
 #[test]
 fn _assignment() {
-    let mut env = Env::prelude();
+    let mut env = Env::<f64>::prelude();
     run("x = 6", &mut env).unwrap();
     assert_eq!(
         env.find_value("x"),

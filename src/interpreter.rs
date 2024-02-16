@@ -1,3 +1,5 @@
+use num_traits::real::Real;
+
 use crate::env::Env;
 use crate::function::*;
 use crate::parser::*;
@@ -5,15 +7,16 @@ use crate::pratt;
 use crate::s;
 use std::fmt::Debug;
 use std::fmt::Formatter;
+use std::str::FromStr;
 
 #[derive(Clone, PartialEq)]
-pub enum Expr {
-    Literal(f64),
-    Function(Function),
-    Variable(String, f64),
+pub enum Expr<N> {
+    Literal(N),
+    Function(Function<N>),
+    Variable(String, N),
 }
 
-impl Debug for Expr {
+impl<N: std::fmt::Debug> Debug for Expr<N> {
     fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), std::fmt::Error> {
         match self {
             Expr::Literal(n) => write!(f, "{:?}", n),
@@ -23,7 +26,10 @@ impl Debug for Expr {
     }
 }
 
-pub fn run(text: &str, env: &mut Env) -> Parsed<f64> {
+pub fn run<N: Real + Debug + FromStr>(text: &str, env: &mut Env<N>) -> Parsed<N>
+where
+    <N as FromStr>::Err: std::fmt::Debug,
+{
     let tks = parse(text, env)?;
     match tks {
         Stmt::Expr(mut tks) => Ok(s::eval(&pratt::expr(&mut tks, env))),
