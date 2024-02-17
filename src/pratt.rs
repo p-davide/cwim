@@ -14,51 +14,179 @@ use crate::token::TokenType;
 
 // Modified from https://github.com/matklad/minipratt
 
-pub fn expr<N: PartialEq + Real + std::fmt::Debug + FromStr>(lexer: &mut Vec<Token>, env: &env::Env<N>) -> S<N> {
-    lexer.reverse();
-    pop_trailing_space(lexer);
-    expr_bp(lexer, env, Priority::min())
+pub(crate) struct Lexer<'a, 'e, 'l, N> {
+    pub(crate) lexer: &'l mut Vec<Token<'a>>,
+    pub(crate) env: &'e env::Env<N>,
 }
 
-fn pop_trailing_space<'a>(lexer: &mut Vec<Token<'a>>) -> Option<Token<'a>> {
-    if lexer.last().is_some_and(|it| it.ttype == TokenType::Space) {
-        lexer.pop()
-    } else {
-        None
+impl<'a, 'e, 'l, N: PartialEq + Real + std::fmt::Debug + FromStr> Lexer<'a, 'e, 'l, N> {
+    pub fn expr(&mut self) -> S<N> {
+        self.lexer.reverse();
+        self.pop_trailing_space();
+        self.expr_bp(Priority::min())
     }
-}
 
-fn pop_spaced_infix(lexer: &mut Vec<Token>) {
-    pop_trailing_space(lexer);
-    match lexer.last().map(|it| it.ttype) {
-        Some(TokenType::Literal) => {}
-        _ => {
-            lexer.pop();
-            pop_trailing_space(lexer);
+    fn expr_bp(&mut self, min_binding: Priority) -> S<N> {
+        let mut lhs = match self.lexer.pop() {
+            Some(t) => match t.ttype {
+                // TODO: This is very janky.
+                TokenType::Literal => S::Var(if let Ok(n) = t.lexeme.parse::<N>() {
+                    n
+                } else if let Ok(n) = self.env.find_value(t.lexeme) {
+                    match n {
+                        Expr::Literal(n) => n,
+                        _ => panic!("{}", t.lexeme),
+                    }
+                } else {
+                    panic!("{}", t.lexeme)
+                }),
+                TokenType::Symbol => {
+                    let ((), right) = prefix_binding_power(t.lexeme, self.env);
+                    let spaces = self
+                        .pop_trailing_space()
+                        .map_or(0, |it| it.lexeme.len() as u16);
+                    let rhs = self.expr_bp(Priority {
+                        spaces,
+                        op_priority: right,
+                    });
+                    S::Fun(get_prefix_by_name(t.lexeme, self.env), vec![rhs])
+                }
+                TokenType::LParen => {
+                    self.pop_trailing_space();
+                    let lhs = self.expr_bp(Priority::min());
+                    // eof is assumed to close every (, such that eg -(5-6 = 1
+                    self.pop_trailing_space();
+                    assert_eq!(
+                        self.lexer.pop().map_or(TokenType::RParen, |it| it.ttype),
+                        TokenType::RParen
+                    );
+                    lhs
+                }
+                // TODO: This assumes every name is of a unary prefix function.
+                //       Functions with more args should be supported.
+                TokenType::Identifier => match self.env.find_unary_or_literal(t.lexeme) {
+                    Ok(Expr::Function(_)) => {
+                        let ((), right) = prefix_binding_power(t.lexeme, self.env);
+                        let spaces = self
+                            .pop_trailing_space()
+                            .map_or(0, |it| it.lexeme.len() as u16);
+                        let rhs = self.expr_bp(Priority {
+                            spaces,
+                            op_priority: right,
+                        });
+                        S::Fun(get_prefix_by_name(t.lexeme, self.env), vec![rhs])
+                    }
+                    Ok(Expr::Literal(n)) => S::Var(n),
+                    bad => {
+                        panic!("{:?}", bad)
+                    }
+                },
+                _ => unreachable!(
+                    "unexpected token {:?}, lexer state: {:?}",
+                    t.lexeme, self.lexer
+                ),
+            },
+            _ => unreachable!("empty lexer"),
+        };
+
+        loop {
+            let (spaces, maybe_token) = self.spaced_infix();
+            let (spaces, op) = match maybe_token {
+                None => break,
+                Some(t) => {
+                    match t.ttype {
+                        TokenType::Symbol | TokenType::RParen => (spaces, t.lexeme),
+                        // Finding a ( here instead of an operator means the expression is like ...2(3+...
+                        // We treat this as a multiplication.
+                        TokenType::LParen => (0xffff, "*"),
+                        TokenType::Literal => (spaces, "*"),
+                        TokenType::Identifier => match self.env.find_unary_or_literal(t.lexeme) {
+                            Ok(Expr::Function(_)) => {
+                                let ((), right) = prefix_binding_power(t.lexeme, self.env);
+                                let spaces = self
+                                    .pop_trailing_space()
+                                    .map_or(0, |it| it.lexeme.len() as u16);
+                                let rhs = self.expr_bp(Priority {
+                                    spaces,
+                                    op_priority: right,
+                                });
+                                return S::Fun(MUL(), vec![lhs, rhs]);
+                            }
+                            Ok(Expr::Literal(n)) => return S::Var(n),
+                            bad => {
+                                panic!("{:?}", bad)
+                            }
+                        },
+                        t => unreachable!("{:?} with lexer state {:?}", t, self.lexer),
+                    }
+                }
+            };
+
+            if let Some((left, right)) = infix_binding_power(op, self.env) {
+                let op_priority = Priority {
+                    spaces,
+                    op_priority: left,
+                };
+                if op_priority < min_binding {
+                    break;
+                }
+                self.pop_spaced_infix();
+                let rhs = self.expr_bp(Priority {
+                    spaces: std::cmp::min(min_binding.spaces, spaces),
+                    op_priority: right,
+                });
+                lhs = S::Fun(get_infix_by_name(op, self.env), vec![lhs, rhs]);
+                continue;
+            }
+            break;
+        }
+        lhs
+    }
+
+    fn pop_trailing_space(&mut self) -> Option<Token<'a>> {
+        if self
+            .lexer
+            .last()
+            .is_some_and(|it| it.ttype == TokenType::Space)
+        {
+            self.lexer.pop()
+        } else {
+            None
         }
     }
-}
 
-fn spaced_infix<'a>(lexer: &mut Vec<Token<'a>>) -> (u16, Option<Token<'a>>) {
-    let pre_space = pop_trailing_space(lexer);
-    let pre_spaces = pre_space.map_or(0, |it| it.lexeme.len() as u16);
-    let maybe_token = lexer.pop();
-    let post_space = pop_trailing_space(lexer);
-    let mut post_spaces = post_space.map_or(0, |it| it.lexeme.len() as u16);
-    // Ignore ending spaces
-    if lexer.is_empty() {
-        post_spaces = 0;
+    fn pop_spaced_infix(&mut self) {
+        self.pop_trailing_space();
+        match self.lexer.last().map(|it| it.ttype) {
+            Some(TokenType::Literal) => {}
+            _ => {
+                self.lexer.pop();
+                self.pop_trailing_space();
+            }
+        }
     }
-    if let Some(t) = post_space {
-        lexer.push(t);
+    
+    fn spaced_infix(&mut self) -> (u16, Option<Token<'a>>) {
+        let pre_space = self.pop_trailing_space();
+        let pre_spaces = pre_space.map_or(0, |it| it.lexeme.len() as u16);
+        let maybe_token = self.lexer.pop();
+        let post_space = self.pop_trailing_space();
+        let mut post_spaces = post_space.map_or(0, |it| it.lexeme.len() as u16);
+        // Ignore ending spaces
+        if self.lexer.is_empty() {
+            post_spaces = 0;
+        }
+        if let Some(t) = post_space {
+            self.lexer.push(t);
+        }
+        if let Some(t) = maybe_token {
+            self.lexer.push(t);
+        }
+        if let Some(t) = pre_space {
+            self.lexer.push(t);
+        }
+        (std::cmp::max(pre_spaces, post_spaces), maybe_token)
     }
-    if let Some(t) = maybe_token {
-        lexer.push(t);
-    }
-    if let Some(t) = pre_space {
-        lexer.push(t);
-    }
-    (std::cmp::max(pre_spaces, post_spaces), maybe_token)
 }
 
 fn get_infix_by_name<N: Real>(name: &str, env: &env::Env<N>) -> Function<N> {
@@ -73,131 +201,6 @@ fn get_prefix_by_name<N: Real>(name: &str, env: &env::Env<N>) -> Function<N> {
         Ok(interpreter::Expr::Function(f)) => f,
         _ => panic!("Unary {} not found", name),
     }
-}
-
-fn expr_bp<N: Real + std::fmt::Debug+ std::str::FromStr>(lexer: &mut Vec<Token>, env: &env::Env<N>, min_binding: Priority) -> S<N> {
-    let mut lhs = match lexer.pop() {
-        Some(t) => match t.ttype {
-            // TODO: This is very janky.
-            TokenType::Literal => S::Var(if let Ok(n) = t.lexeme.parse::<N>(){
-                n
-            } else if let Ok(n) = env.find_value(t.lexeme) {
-                match n {
-                    Expr::Literal(n) => n,
-                    _ => panic!("{}", t.lexeme),
-                }
-            } else {
-                panic!("{}", t.lexeme)
-            }),
-            TokenType::Symbol => {
-                let ((), right) = prefix_binding_power(t.lexeme, env);
-                let spaces = pop_trailing_space(lexer).map_or(0, |it| it.lexeme.len() as u16);
-                let rhs = expr_bp(
-                    lexer,
-                    env,
-                    Priority {
-                        spaces,
-                        op_priority: right,
-                    },
-                );
-                S::Fun(get_prefix_by_name(t.lexeme, env), vec![rhs])
-            }
-            TokenType::LParen => {
-                pop_trailing_space(lexer);
-                let lhs = expr_bp(lexer, env, Priority::min());
-                // eof is assumed to close every (, such that eg -(5-6 = 1
-                pop_trailing_space(lexer);
-                assert_eq!(
-                    lexer.pop().map_or(TokenType::RParen, |it| it.ttype),
-                    TokenType::RParen
-                );
-                lhs
-            }
-            // TODO: This assumes every name is of a unary prefix function.
-            //       Functions with more args should be supported.
-            TokenType::Identifier => match env.find_unary_or_literal(t.lexeme) {
-                Ok(Expr::Function(_)) => {
-                    let ((), right) = prefix_binding_power(t.lexeme, env);
-                    let spaces = pop_trailing_space(lexer).map_or(0, |it| it.lexeme.len() as u16);
-                    let rhs = expr_bp(
-                        lexer,
-                        env,
-                        Priority {
-                            spaces,
-                            op_priority: right,
-                        },
-                    );
-                    S::Fun(get_prefix_by_name(t.lexeme, env), vec![rhs])
-                }
-                Ok(Expr::Literal(n)) => S::Var(n),
-                bad => {
-                    panic!("{:?}", bad)
-                }
-            },
-            _ => unreachable!("unexpected token {:?}, lexer state: {:?}", t.lexeme, lexer),
-        },
-        _ => unreachable!("empty lexer"),
-    };
-
-    loop {
-        let (spaces, maybe_token) = spaced_infix(lexer);
-        let (spaces, op) = match maybe_token {
-            None => break,
-            Some(t) => {
-                match t.ttype {
-                    TokenType::Symbol | TokenType::RParen => (spaces, t.lexeme),
-                    // Finding a ( here instead of an operator means the expression is like ...2(3+...
-                    // We treat this as a multiplication.
-                    TokenType::LParen => (0xffff, "*"),
-                    TokenType::Literal => (spaces, "*"),
-                    TokenType::Identifier => match env.find_unary_or_literal(t.lexeme) {
-                        Ok(Expr::Function(_)) => {
-                            let ((), right) = prefix_binding_power(t.lexeme, env);
-                            let spaces =
-                                pop_trailing_space(lexer).map_or(0, |it| it.lexeme.len() as u16);
-                            let rhs = expr_bp(
-                                lexer,
-                                env,
-                                Priority {
-                                    spaces,
-                                    op_priority: right,
-                                },
-                            );
-                            return S::Fun(MUL(), vec![lhs, rhs]);
-                        }
-                        Ok(Expr::Literal(n)) => return S::Var(n),
-                        bad => {
-                            panic!("{:?}", bad)
-                        }
-                    },
-                    t => unreachable!("{:?} with lexer state {:?}", t, lexer),
-                }
-            }
-        };
-
-        if let Some((left, right)) = infix_binding_power(op, env) {
-            let op_priority = Priority {
-                spaces,
-                op_priority: left,
-            };
-            if op_priority < min_binding {
-                break;
-            }
-            pop_spaced_infix(lexer);
-            let rhs = expr_bp(
-                lexer,
-                env,
-                Priority {
-                    spaces: std::cmp::min(min_binding.spaces, spaces),
-                    op_priority: right,
-                },
-            );
-            lhs = S::Fun(get_infix_by_name(op, env), vec![lhs, rhs]);
-            continue;
-        }
-        break;
-    }
-    lhs
 }
 
 fn infix_binding_power<N: Real>(op: &str, env: &env::Env<N>) -> Option<(u16, u16)> {
@@ -229,7 +232,11 @@ mod test {
         let stmt = parser::parse(input, &env::Env::<f64>::prelude()).unwrap();
         match stmt {
             Stmt::Expr(mut tokens) => {
-                let actual: S<f64> = expr(&mut tokens, &mut env::Env::prelude());
+                let actual: S<f64> = Lexer {
+                    lexer: &mut tokens,
+                    env: &mut env::Env::prelude(),
+                }
+                .expr();
                 assert_eq!(actual.to_string(), expected);
             }
             _ => panic!("expected expression"),

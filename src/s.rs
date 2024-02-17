@@ -108,7 +108,7 @@ mod test {
         env,
         function::{ADD, ID, MUL},
         parser::{self, Stmt},
-        pratt::expr,
+        pratt::Lexer,
     };
 
     use super::*;
@@ -125,7 +125,11 @@ mod test {
         let stmt = parser::parse::<f64>("2(+3+5)", &env::Env::prelude()).unwrap();
         match stmt {
             Stmt::Expr(mut tokens) => {
-                let actual = expr(&mut tokens, &mut env::Env::prelude());
+                let actual = Lexer {
+                    lexer: &mut tokens,
+                    env: &mut env::Env::prelude(),
+                }
+                .expr();
                 assert_eq!(expected, actual);
                 assert_eq!(eval(&expected), eval(&actual));
             }

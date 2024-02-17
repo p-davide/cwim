@@ -32,9 +32,9 @@ where
 {
     let tks = parse(text, env)?;
     match tks {
-        Stmt::Expr(mut tks) => Ok(s::eval(&pratt::expr(&mut tks, env))),
-        Stmt::Assignment(name, mut expr) => {
-            let result = s::eval(&pratt::expr(&mut expr, env));
+        Stmt::Expr(mut tks) => Ok(s::eval(&pratt::Lexer{lexer: &mut tks, env}.expr())),
+        Stmt::Assignment(name, mut tks) => {
+            let result = s::eval(&pratt::Lexer{lexer: &mut tks, env}.expr());
             match env.assign(name, result) {
                 Some(_) => Err("already exists".to_owned()),
                 None => Ok(result),

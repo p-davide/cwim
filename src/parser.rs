@@ -208,8 +208,8 @@ fn parse_known_identifier<'a, N: Real + FromStr>(
     let lexeme = parse_identifier(text)?;
     match env.find_unary_or_literal(lexeme) {
         Err(msg) => Err(msg),
-        Ok(Expr::Literal(n)) => Ok(Token::new(TokenType::Literal, lexeme)),
-        Ok(Expr::Function(f)) => Ok(Token::new(TokenType::Identifier, lexeme)),
+        Ok(Expr::Literal(_)) => Ok(Token::new(TokenType::Literal, lexeme)),
+        Ok(Expr::Function(_)) => Ok(Token::new(TokenType::Identifier, lexeme)),
         _ => unimplemented!(),
     }
 }
