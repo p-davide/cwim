@@ -1,5 +1,5 @@
 use num_traits::real::Real;
-use num_traits::{Num, One};
+use num_traits::Num;
 
 use crate::function::*;
 use crate::interpreter::Expr;

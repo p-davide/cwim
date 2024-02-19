@@ -35,10 +35,8 @@ where
         Stmt::Expr(mut tks) => Ok(s::eval(&pratt::Lexer{lexer: &mut tks, env}.expr())),
         Stmt::Assignment(name, mut tks) => {
             let result = s::eval(&pratt::Lexer{lexer: &mut tks, env}.expr());
-            match env.assign(name, result) {
-                Some(_) => Err("already exists".to_owned()),
-                None => Ok(result),
-            }
+            env.assign(name, result);
+            Ok(result)
         }
     }
 }

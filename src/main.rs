@@ -15,15 +15,16 @@ where
 {
     match run(line, env) {
         Ok(result) => {
-            println!("{}", result);
             env.assign("ans".to_owned(), result);
         }
         Err(msg) => eprintln!("{}", msg),
     }
 }
 
-fn repl<N: Display + Real + std::fmt::Debug + FromStr>() -> Result<()> where
-    <N as FromStr>::Err: std::fmt::Debug,{
+fn repl<N: Display + Real + std::fmt::Debug + FromStr>() -> Result<()>
+where
+    <N as FromStr>::Err: std::fmt::Debug,
+{
     let mut env = Env::<N>::prelude();
     let mut rl = DefaultEditor::new()?;
     #[cfg(feature = "with-file-history")]
@@ -36,6 +37,11 @@ fn repl<N: Display + Real + std::fmt::Debug + FromStr>() -> Result<()> where
             Ok(line) => {
                 let _ = rl.add_history_entry(line.as_str());
                 run_line(&line, &mut env);
+                match env.find_value("ans") {
+                    Ok(Expr::Literal(n)) => println!("{}", n),
+                    Ok(_) => unreachable!(),
+                    Err(msg) => eprintln!("{}", msg),
+                }
             }
             Err(ReadlineError::Interrupted) => {
                 eprintln!("Interrupted");
@@ -61,6 +67,11 @@ fn main() {
         let mut env = Env::<f64>::prelude();
         for line in stdin.lines() {
             run_line(&line.expect("no line found"), &mut env);
+        }
+        match env.find_value("ans") {
+            Ok(Expr::Literal(n)) => println!("{}", n),
+            Ok(_) => unreachable!(),
+            Err(msg) => eprintln!("{}", msg),
         }
     }
 }
