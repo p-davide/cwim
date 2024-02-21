@@ -32,9 +32,21 @@ where
 {
     let tks = parse(text, env)?;
     match tks {
-        Stmt::Expr(mut tks) => Ok(s::eval(&pratt::Lexer{lexer: &mut tks, env}.expr())),
+        Stmt::Expr(mut tks) => Ok(s::eval(
+            &pratt::Lexer {
+                lexer: &mut tks,
+                env,
+            }
+            .expr(),
+        )),
         Stmt::Assignment(name, mut tks) => {
-            let result = s::eval(&pratt::Lexer{lexer: &mut tks, env}.expr());
+            let result = s::eval(
+                &pratt::Lexer {
+                    lexer: &mut tks,
+                    env,
+                }
+                .expr(),
+            );
             env.assign(name, result);
             Ok(result)
         }

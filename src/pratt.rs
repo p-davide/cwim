@@ -15,7 +15,7 @@ use crate::token::TokenType;
 // Modified from https://github.com/matklad/minipratt
 
 pub(crate) struct Lexer<'a, 'e, 'l, N> {
-    pub(crate) lexer: &'l mut Vec<Token<'a>>,
+    pub(crate) lexer: &'l mut Vec<Token<'a, N>>,
     pub(crate) env: &'e env::Env<N>,
 }
 
@@ -29,17 +29,7 @@ impl<'a, 'e, 'l, N: PartialEq + Real + std::fmt::Debug + FromStr> Lexer<'a, 'e, 
     fn expr_bp(&mut self, min_binding: Priority) -> S<N> {
         let mut lhs = match self.lexer.pop() {
             Some(t) => match t.ttype {
-                // TODO: This is very janky.
-                TokenType::Literal => S::Var(if let Ok(n) = t.lexeme.parse::<N>() {
-                    n
-                } else if let Ok(n) = self.env.find_value(t.lexeme) {
-                    match n {
-                        Expr::Literal(n) => n,
-                        _ => panic!("{}", t.lexeme),
-                    }
-                } else {
-                    panic!("{}", t.lexeme)
-                }),
+                TokenType::Literal(n) => S::Var(n),
                 TokenType::Symbol => {
                     let ((), right) = prefix_binding_power(t.lexeme, self.env);
                     let spaces = self
@@ -99,7 +89,7 @@ impl<'a, 'e, 'l, N: PartialEq + Real + std::fmt::Debug + FromStr> Lexer<'a, 'e, 
                         // Finding a ( here instead of an operator means the expression is like ...2(3+...
                         // We treat this as a multiplication.
                         TokenType::LParen => (0xffff, "*"),
-                        TokenType::Literal => (spaces, "*"),
+                        TokenType::Literal(_) => (spaces, "*"),
                         TokenType::Identifier => match self.env.find_unary_or_literal(t.lexeme) {
                             Ok(Expr::Function(_)) => {
                                 let ((), right) = prefix_binding_power(t.lexeme, self.env);
@@ -143,7 +133,7 @@ impl<'a, 'e, 'l, N: PartialEq + Real + std::fmt::Debug + FromStr> Lexer<'a, 'e, 
         lhs
     }
 
-    fn pop_trailing_space(&mut self) -> Option<Token<'a>> {
+    fn pop_trailing_space(&mut self) -> Option<Token<'a, N>> {
         if self
             .lexer
             .last()
@@ -158,15 +148,15 @@ impl<'a, 'e, 'l, N: PartialEq + Real + std::fmt::Debug + FromStr> Lexer<'a, 'e, 
     fn pop_spaced_infix(&mut self) {
         self.pop_trailing_space();
         match self.lexer.last().map(|it| it.ttype) {
-            Some(TokenType::Literal) => {}
+            Some(TokenType::Literal(_)) => {}
             _ => {
                 self.lexer.pop();
                 self.pop_trailing_space();
             }
         }
     }
-    
-    fn spaced_infix(&mut self) -> (u16, Option<Token<'a>>) {
+
+    fn spaced_infix(&mut self) -> (u16, Option<Token<'a, N>>) {
         let pre_space = self.pop_trailing_space();
         let pre_spaces = pre_space.map_or(0, |it| it.lexeme.len() as u16);
         let maybe_token = self.lexer.pop();

@@ -1,6 +1,6 @@
 #[derive(PartialEq, Debug, Copy, Clone)]
-pub enum TokenType {
-    Literal,
+pub enum TokenType<N> {
+    Literal(N),
     Identifier,
     Symbol,
     Space,
@@ -16,18 +16,14 @@ pub enum TokenType {
 }
 
 #[derive(PartialEq, Debug, Copy, Clone)]
-pub struct Token<'t> {
-    pub ttype: TokenType,
+pub struct Token<'t, N> {
+    pub ttype: TokenType<N>,
     pub lexeme: &'t str,
 }
 
-impl<'t> Token<'t> {
-    pub fn new(ttype: TokenType, lexeme: &'t str) -> Self {
+impl<'t, N> Token<'t, N> {
+    pub fn new(ttype: TokenType<N>, lexeme: &'t str) -> Self {
         Self { ttype, lexeme }
-    }
-
-    pub fn lit(lexeme: &'t str) -> Self {
-        Self::new(TokenType::Literal, lexeme)
     }
 
     pub fn sym(lexeme: &'t str) -> Self {

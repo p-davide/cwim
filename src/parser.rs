@@ -5,16 +5,16 @@ use num_traits::real::Real;
 use crate::{env::Env, interpreter::Expr, token::*};
 
 pub type Parsed<T> = Result<T, String>;
-type Expression<'a> = Vec<Token<'a>>;
+type Expression<'a, N> = Vec<Token<'a, N>>;
 
 #[derive(Debug, PartialEq)]
-pub enum Stmt<'a> {
-    Expr(Expression<'a>),
-    Assignment(String, Expression<'a>),
+pub enum Stmt<'a, N> {
+    Expr(Expression<'a, N>),
+    Assignment(String, Expression<'a, N>),
 }
 
-impl<'a> Stmt<'a> {
-    pub fn rhs(&self) -> &Expression<'a> {
+impl<'a, N> Stmt<'a, N> {
+    pub fn rhs(&self) -> &Expression<'a, N> {
         match self {
             Self::Assignment(_, it) => it,
             Self::Expr(it) => it,
@@ -46,7 +46,7 @@ fn parse_assignee<N>(text: &str) -> Parsed<(usize, String)> {
     Ok((i, assignee.to_owned()))
 }
 
-pub fn parse<'a, N: Real + FromStr>(text: &'a str, env: &Env<N>) -> Parsed<Stmt<'a>>
+pub fn parse<'a, N: Real + FromStr>(text: &'a str, env: &Env<N>) -> Parsed<Stmt<'a, N>>
 where
     <N as FromStr>::Err: std::fmt::Debug,
 {
@@ -70,7 +70,7 @@ where
     }
 }
 
-fn parse_token<'a, N: Real + FromStr>(text: &'a str, env: &Env<N>) -> Parsed<Token<'a>>
+fn parse_token<'a, N: Real + FromStr>(text: &'a str, env: &Env<N>) -> Parsed<Token<'a, N>>
 where
     <N as FromStr>::Err: std::fmt::Debug,
 {
@@ -104,7 +104,7 @@ where
 
 pub const SYMBOLS: &str = "!@$%^&*|\"';,./+-=";
 
-fn parse_char<N>(expected: char, ttype: TokenType, text: &str) -> Parsed<Token> {
+fn parse_char<N>(expected: char, ttype: TokenType<N>, text: &str) -> Parsed<Token<N>> {
     let actual = text.chars().next().ok_or("Tried to parse empty token")?;
     if expected == actual {
         Ok(Token::new(ttype, &text[..1]))
@@ -113,7 +113,7 @@ fn parse_char<N>(expected: char, ttype: TokenType, text: &str) -> Parsed<Token> 
     }
 }
 
-fn parse_spaces<N>(text: &str) -> Parsed<Token> {
+fn parse_spaces<N>(text: &str) -> Parsed<Token<N>> {
     let l = text.chars().take_while(|c| *c == ' ').count();
     if l == 0 {
         Err("empty space token".to_owned())
@@ -122,35 +122,35 @@ fn parse_spaces<N>(text: &str) -> Parsed<Token> {
     }
 }
 
-fn parse_comma<N>(text: &str) -> Parsed<Token> {
+fn parse_comma<N>(text: &str) -> Parsed<Token<N>> {
     parse_char::<N>(',', TokenType::Comma, text)
 }
 
-fn parse_semicolon<N>(text: &str) -> Parsed<Token> {
+fn parse_semicolon<N>(text: &str) -> Parsed<Token<N>> {
     parse_char::<N>(';', TokenType::Semicolon, text)
 }
 
-fn parse_newline<N>(text: &str) -> Parsed<Token> {
+fn parse_newline<N>(text: &str) -> Parsed<Token<N>> {
     parse_char::<N>('\n', TokenType::Newline, text)
 }
 
-fn parse_lbracket<N>(text: &str) -> Parsed<Token> {
+fn parse_lbracket<N>(text: &str) -> Parsed<Token<N>> {
     parse_char::<N>('[', TokenType::LBracket, text)
 }
 
-fn parse_rbracket<N>(text: &str) -> Parsed<Token> {
+fn parse_rbracket<N>(text: &str) -> Parsed<Token<N>> {
     parse_char::<N>(']', TokenType::RBracket, text)
 }
 
-fn parse_lparen<N>(text: &str) -> Parsed<Token> {
+fn parse_lparen<N>(text: &str) -> Parsed<Token<N>> {
     parse_char::<N>('(', TokenType::LParen, text)
 }
 
-fn parse_rparen<N>(text: &str) -> Parsed<Token> {
+fn parse_rparen<N>(text: &str) -> Parsed<Token<N>> {
     parse_char::<N>(')', TokenType::RParen, text)
 }
 
-fn parse_comment<N>(text: &str) -> Parsed<Token> {
+fn parse_comment<N>(text: &str) -> Parsed<Token<N>> {
     let l = text.chars().take_while(|c| *c != '\n').count();
     if l == 0 {
         Err("empty comment".to_owned())
@@ -159,7 +159,7 @@ fn parse_comment<N>(text: &str) -> Parsed<Token> {
     }
 }
 
-fn parse_number<N: FromStr>(text: &str) -> Parsed<Token>
+fn parse_number<N: FromStr>(text: &str) -> Parsed<Token<N>>
 where
     <N as FromStr>::Err: std::fmt::Debug,
 {
@@ -175,14 +175,16 @@ where
     if lexeme == "-" {
         return Err("minus sign not part of negative number".to_owned());
     }
-    let parsed = lexeme.parse::<N>();
-    if parsed.is_err() {
-        return Err(format!("failed to parse '{}'", lexeme));
-    }
     if l == 0 {
-        Err("empty number".to_owned())
+        return Err("empty number".to_owned());
+    }
+    if let Ok(n) = lexeme.parse::<N>() {
+        Ok(Token {
+            ttype: TokenType::Literal(n),
+            lexeme,
+        })
     } else {
-        Ok(Token::lit(lexeme))
+        Err(format!("can't parse {}'", lexeme))
     }
 }
 
@@ -204,17 +206,17 @@ fn parse_identifier(text: &str) -> Parsed<&str> {
 fn parse_known_identifier<'a, N: Real + FromStr>(
     text: &'a str,
     env: &Env<N>,
-) -> Parsed<Token<'a>> {
+) -> Parsed<Token<'a, N>> {
     let lexeme = parse_identifier(text)?;
     match env.find_unary_or_literal(lexeme) {
         Err(msg) => Err(msg),
-        Ok(Expr::Literal(_)) => Ok(Token::new(TokenType::Literal, lexeme)),
+        Ok(Expr::Literal(n)) => Ok(Token::new(TokenType::Literal(n), lexeme)),
         Ok(Expr::Function(_)) => Ok(Token::new(TokenType::Identifier, lexeme)),
         _ => unimplemented!(),
     }
 }
 
-fn parse_symbol<N>(text: &str) -> Parsed<Token> {
+fn parse_symbol<N>(text: &str) -> Parsed<Token<N>> {
     let actual = text.chars().next().ok_or("there should be a char here")?;
     if SYMBOLS.contains(actual) {
         Ok(Token::sym(&text[..1]))
