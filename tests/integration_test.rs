@@ -141,14 +141,24 @@ fn _double_unary() {
 
 #[test]
 fn _1st_deg_poly() {
-    assert_eq!(run("7x", &mut Env::prelude()).is_err(), true)
+    let mut env = Env::prelude();
+    run("7x = 14", &mut env);
+    assert_eq!(
+        env.find_value("x"),
+        Ok(cwim::interpreter::Expr::Literal(2.))
+    );
+    run("7y+5y = 12", &mut env);
+    assert_eq!(
+        env.find_value("y"),
+        Ok(cwim::interpreter::Expr::Literal(1.))
+    );
 }
 
 // TODO: Test assignments more.
 #[test]
 fn _assignment() {
     let mut env = Env::prelude();
-    run("x = 6", &mut env).unwrap();
+    run("x = 6", &mut env);
     assert_eq!(
         env.find_value("x"),
         Ok(cwim::interpreter::Expr::Literal(6.))

@@ -6,7 +6,7 @@ type Expression<'a> = Vec<Token<'a>>;
 #[derive(Debug, PartialEq)]
 pub enum Stmt<'a> {
     Expr(Expression<'a>),
-    Assignment(String, Expression<'a>),
+    Assignment(Expression<'a>, Expression<'a>),
 }
 
 impl<'a> Stmt<'a> {
@@ -18,47 +18,25 @@ impl<'a> Stmt<'a> {
     }
 }
 
-fn parse_assignee(text: &str) -> Parsed<(usize, String)> {
-    let mut i = 0;
-
-    if let Ok(token) = parse_spaces(text) {
-        i += token.lexeme.len();
-    }
-
-    let assignee = parse_identifier(&text[i..])?;
-    i += assignee.len();
-
-    if let Ok(token) = parse_spaces(&text[i..]) {
-        i += token.lexeme.len();
-    }
-
-    parse_char('=', TokenType::Space, &text[i..])?;
-    i += 1;
-
-    if let Ok(token) = parse_spaces(&text[i..]) {
-        i += token.lexeme.len();
-    }
-
-    Ok((i, assignee.to_owned()))
-}
-
 pub fn parse<'a>(text: &'a str, env: &Env) -> Parsed<Stmt<'a>> {
     let mut tokens = vec![];
-    if let Ok((n, assignee)) = parse_assignee(text) {
-        let mut to_parse = &text[n..];
-        while !to_parse.is_empty() {
-            let token = parse_token(to_parse, env)?;
-            tokens.push(token);
-            to_parse = &to_parse[token.lexeme.len()..];
+
+    let mut sides = text.split('=');
+    let mut lhs = sides.next().expect("no =?");
+    while !lhs.is_empty() {
+        let token = parse_token(lhs, env)?;
+        tokens.push(token);
+        lhs = &lhs[token.lexeme.len()..];
+    }
+    if let Some(mut rhs) = sides.next() {
+        let mut right_tokens = vec![];
+        while !rhs.is_empty() {
+            let token = parse_token(rhs, env)?;
+            right_tokens.push(token);
+            rhs = &rhs[token.lexeme.len()..];
         }
-        Ok(Stmt::Assignment(assignee, tokens))
+        Ok(Stmt::Assignment(tokens, right_tokens))
     } else {
-        let mut to_parse = text;
-        while !to_parse.is_empty() {
-            let token = parse_token(to_parse, env)?;
-            tokens.push(token);
-            to_parse = &to_parse[token.lexeme.len()..];
-        }
         Ok(Stmt::Expr(tokens))
     }
 }
@@ -191,10 +169,8 @@ fn parse_identifier(text: &str) -> Parsed<&str> {
 fn parse_known_identifier<'a>(text: &'a str, env: &Env) -> Parsed<Token<'a>> {
     let lexeme = parse_identifier(text)?;
     match env.find_unary_or_literal(lexeme) {
-        Err(msg) => Err(msg),
         Ok(Expr::Literal(n)) => Ok(Token::new(TokenType::Literal(n), lexeme)),
-        Ok(Expr::Function(f)) => Ok(Token::new(TokenType::Identifier, lexeme)),
-        _ => unimplemented!(),
+        _ => Ok(Token::new(TokenType::Identifier, lexeme)),
     }
 }
 
@@ -212,13 +188,6 @@ mod test {
     use crate::env;
 
     use super::*;
-
-    #[test]
-    fn _assignment() {
-        let input = "x = 6";
-        let expected = Stmt::Assignment("x".to_owned(), vec![Token::lit(6., "6")]);
-        assert_eq!(parse(input, &Env::prelude()).unwrap(), expected);
-    }
 
     #[test]
     fn _z() {
@@ -244,6 +213,17 @@ mod test {
             parse(spaces, &env::Env::prelude()).unwrap(),
             Stmt::Expr(vec![Token::new(TokenType::Space, spaces)])
         );
+    }
+
+    #[test]
+    fn _assignment() {
+        assert_eq!(
+            parse("x=6", &env::Env::prelude()).unwrap(),
+            Stmt::Assignment(
+                vec![Token::new(TokenType::Identifier, "x")],
+                vec![Token::lit(6., "6")]
+            )
+        )
     }
 
     #[test]
