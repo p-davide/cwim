@@ -3,7 +3,7 @@ use crate::{env::Env, interpreter::Expr, token::*};
 pub type Parsed<T> = Result<T, String>;
 type Expression<'a> = Vec<Token<'a>>;
 
-#[derive(Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum Stmt<'a> {
     Expr(Expression<'a>),
     Assignment(Expression<'a>, Expression<'a>),
@@ -223,6 +223,16 @@ mod test {
                 vec![Token::new(TokenType::Identifier, "x")],
                 vec![Token::lit(6., "6")]
             )
+        );
+        assert_eq!(
+            parse("7x+5y", &env::Env::prelude()).unwrap(),
+            Stmt::Expr(vec![
+                Token::lit(7., "7"),
+                Token::new(TokenType::Identifier, "x"),
+                Token::new(TokenType::Symbol, "+"),
+                Token::lit(5., "5"),
+                Token::new(TokenType::Identifier, "y"),
+            ])
         )
     }
 

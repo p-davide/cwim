@@ -94,6 +94,10 @@ impl Env {
         }
     }
 
+    pub fn get(&self, l: &str) -> Option<&Variable> {
+        self.inner.get(l)
+    }
+
     pub fn find_value(&self, l: &str) -> Parsed<Expr> {
         let var = self.inner.get(l);
         match var {

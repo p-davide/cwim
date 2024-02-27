@@ -10,7 +10,7 @@ use crate::token::TokenType;
 
 // Modified from https://github.com/matklad/minipratt
 
-pub fn expr(lexer: &mut Vec<Token>, env: &env::Env) -> S {
+pub fn expr<'a>(lexer: &mut Vec<Token<'a>>, env: &env::Env) -> S<'a> {
     lexer.reverse();
     pop_trailing_space(lexer);
     expr_bp(lexer, env, Priority::min())
@@ -27,11 +27,11 @@ fn pop_trailing_space<'a>(lexer: &mut Vec<Token<'a>>) -> Option<Token<'a>> {
 fn pop_spaced_infix(lexer: &mut Vec<Token>) {
     pop_trailing_space(lexer);
     match lexer.last().map(|it| it.ttype) {
-        Some(TokenType::Literal(_)) => {}
-        _ => {
+        Some(TokenType::Symbol) => {
             lexer.pop();
             pop_trailing_space(lexer);
         }
+        _ => {}
     }
 }
 
@@ -58,25 +58,32 @@ fn spaced_infix<'a>(lexer: &mut Vec<Token<'a>>) -> (u16, Option<Token<'a>>) {
 }
 
 fn get_infix_by_name(name: &str, env: &env::Env) -> Function {
-    match env.find_binary_or_literal(name) {
-        Ok(interpreter::Expr::Function(f)) => f,
+    match env.get(name) {
+        Some(env::Variable::Function(fs)) => match fs.binary {
+            Some(f) => f,
+            _ => panic!("Unary {} not found", name),
+        },
         _ => panic!("Unary {} not found", name),
     }
 }
 
 fn get_prefix_by_name(name: &str, env: &env::Env) -> Function {
-    match env.find_unary_or_literal(name) {
-        Ok(interpreter::Expr::Function(f)) => f,
+    match env.get(name) {
+        Some(env::Variable::Function(fs)) => match fs.unary {
+            Some(f) => f,
+            _ => panic!("Unary {} not found", name),
+        },
         _ => panic!("Unary {} not found", name),
     }
 }
 
-fn expr_bp(lexer: &mut Vec<Token>, env: &env::Env, min_binding: Priority) -> S {
+fn expr_bp<'a>(lexer: &mut Vec<Token<'a>>, env: &env::Env, min_binding: Priority) -> S<'a> {
     let mut lhs = match lexer.pop() {
         Some(t) => match t.ttype {
             TokenType::Literal(n) => S::Var(n),
             TokenType::Symbol => {
-                let ((), right) = prefix_binding_power(t.lexeme, env);
+                let ((), right) = prefix_binding_power(t.lexeme, env)
+                    .expect(&format!("unknown prefix operator {}", t.lexeme));
                 let spaces = pop_trailing_space(lexer).map_or(0, |it| it.lexeme.len() as u16);
                 let rhs = expr_bp(
                     lexer,
@@ -103,7 +110,8 @@ fn expr_bp(lexer: &mut Vec<Token>, env: &env::Env, min_binding: Priority) -> S {
             //       Functions with more args should be supported.
             TokenType::Identifier => match env.find_unary_or_literal(t.lexeme) {
                 Ok(Expr::Function(_)) => {
-                    let ((), right) = prefix_binding_power(t.lexeme, env);
+                    let ((), right) = prefix_binding_power(t.lexeme, env)
+                        .expect(&format!("unknown prefix operator {}", t.lexeme));
                     let spaces = pop_trailing_space(lexer).map_or(0, |it| it.lexeme.len() as u16);
                     let rhs = expr_bp(
                         lexer,
@@ -116,17 +124,18 @@ fn expr_bp(lexer: &mut Vec<Token>, env: &env::Env, min_binding: Priority) -> S {
                     S::Fun(get_prefix_by_name(t.lexeme, env), vec![rhs])
                 }
                 Ok(Expr::Literal(n)) => S::Var(n),
-                bad => {
-                    panic!("{:?}", bad)
-                }
+                _ => S::Unknown(t.lexeme),
             },
             _ => unreachable!("unexpected token {:?}, lexer state: {:?}", t.lexeme, lexer),
         },
-        _ => unreachable!("empty lexer"),
+        None => unreachable!("empty lexer"),
     };
 
     loop {
         let (spaces, maybe_token) = spaced_infix(lexer);
+        if spaces > min_binding.spaces {
+            break;
+        }
         let (spaces, op) = match maybe_token {
             None => break,
             Some(t) => {
@@ -136,25 +145,27 @@ fn expr_bp(lexer: &mut Vec<Token>, env: &env::Env, min_binding: Priority) -> S {
                     // We treat this as a multiplication.
                     TokenType::LParen => (0xffff, "*"),
                     TokenType::Literal(_) => (spaces, "*"),
-                    TokenType::Identifier => match env.find_unary_or_literal(t.lexeme) {
-                        Ok(Expr::Function(_)) => {
-                            let ((), right) = prefix_binding_power(t.lexeme, env);
-                            let spaces =
-                                pop_trailing_space(lexer).map_or(0, |it| it.lexeme.len() as u16);
-                            let rhs = expr_bp(
-                                lexer,
-                                env,
-                                Priority {
-                                    spaces,
-                                    op_priority: right,
-                                },
-                            );
-                            return S::Fun(MUL, vec![lhs, rhs]);
+                    TokenType::Identifier => match env.get(t.lexeme) {
+                        Some(env::Variable::Function(fs)) => {
+                            match fs.unary.map(|it| it.priority * 2 + 1) {
+                                Some(right) => {
+                                    let spaces = pop_trailing_space(lexer)
+                                        .map_or(0, |it| it.lexeme.len() as u16);
+                                    let rhs = expr_bp(
+                                        lexer,
+                                        env,
+                                        Priority {
+                                            spaces,
+                                            op_priority: right,
+                                        },
+                                    );
+                                    return S::Fun(MUL, vec![lhs, rhs]);
+                                }
+                                None => panic!("expected function, found {}", t.lexeme),
+                            }
                         }
-                        Ok(Expr::Literal(n)) => return S::Var(n),
-                        bad => {
-                            panic!("{:?}", bad)
-                        }
+                        Some(env::Variable::Value(n)) => return S::Var(*n),
+                        None => (spaces, "*"),
                     },
                     t => unreachable!("{:?} with lexer state {:?}", t, lexer),
                 }
@@ -196,13 +207,13 @@ fn infix_binding_power(op: &str, env: &env::Env) -> Option<(u16, u16)> {
     }
 }
 
-fn prefix_binding_power(op: &str, env: &env::Env) -> ((), u16) {
+fn prefix_binding_power(op: &str, env: &env::Env) -> Option<((), u16)> {
     match env.find_unary_or_literal(op) {
         Ok(interpreter::Expr::Function(f)) => {
             let it = f.priority;
-            ((), it * 2 + 1)
+            Some(((), it * 2 + 1))
         }
-        _ => panic!("bad op: {:?}", op),
+        _ => None,
     }
 }
 
@@ -295,5 +306,13 @@ mod test {
     #[test]
     fn _n() {
         tokenize_and_parse("4 log100", "(* 4 (log 100))")
+    }
+
+    #[test]
+    fn _o() {
+        tokenize_and_parse(" sin0 x", "(* (sin 0) x)");
+        tokenize_and_parse("7x", "(* 7 x)");
+        tokenize_and_parse("7x+5y", "(+ (* 7 x) (* 5 y))");
+        tokenize_and_parse("(sin1)x", "(* (sin 1) x)");
     }
 }

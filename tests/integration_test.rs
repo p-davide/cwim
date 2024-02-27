@@ -147,6 +147,11 @@ fn _1st_deg_poly() {
         env.find_value("x"),
         Ok(cwim::interpreter::Expr::Literal(2.))
     );
+}
+
+#[test]
+fn _fwefw() {
+    let mut env = Env::prelude();
     run("7y+5y = 12", &mut env);
     assert_eq!(
         env.find_value("y"),
