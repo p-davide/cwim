@@ -78,12 +78,12 @@ fn rhs<'a>(lexer: &mut Vec<Token<'a>>, env: &env::Env, right: u16) -> S<'a> {
     )
 }
 
-fn expr_bp<'a>(lexer: &mut Vec<Token<'a>>, env: &env::Env, min_binding: Priority) -> S<'a> {
+fn expr_bp<'a>(lexer: &mut Vec<Token<'a>>, env: &env::Env, min_priority: Priority) -> S<'a> {
     let mut lhs = match lexer.pop() {
         Some(t) => match t.ttype {
             TokenType::Literal(n) => S::Var(n),
             TokenType::Symbol => {
-                let right = prefix_binding_power(t.lexeme, env)
+                let right = prefix_op_priority(t.lexeme, env)
                     .expect(&format!("unknown prefix operator {}", t.lexeme));
                 let rhs = rhs(lexer, env, right);
                 S::Fun(get_prefix_by_name(t.lexeme, env), vec![rhs])
@@ -144,12 +144,12 @@ fn expr_bp<'a>(lexer: &mut Vec<Token<'a>>, env: &env::Env, min_binding: Priority
             }
         };
 
-        if let Some((left, right)) = infix_binding_power(op, env) {
+        if let Some((left, right)) = infix_op_priority(op, env) {
             let op_priority = Priority {
                 spaces,
                 op_priority: left,
             };
-            if op_priority < min_binding {
+            if op_priority < min_priority {
                 break;
             }
             pop_spaced_infix(lexer);
@@ -157,7 +157,7 @@ fn expr_bp<'a>(lexer: &mut Vec<Token<'a>>, env: &env::Env, min_binding: Priority
                 lexer,
                 env,
                 Priority {
-                    spaces: std::cmp::min(min_binding.spaces, spaces),
+                    spaces: std::cmp::min(min_priority.spaces, spaces),
                     op_priority: right,
                 },
             );
@@ -169,14 +169,14 @@ fn expr_bp<'a>(lexer: &mut Vec<Token<'a>>, env: &env::Env, min_binding: Priority
     lhs
 }
 
-fn infix_binding_power(op: &str, env: &env::Env) -> Option<(u16, u16)> {
+fn infix_op_priority(op: &str, env: &env::Env) -> Option<(u16, u16)> {
     match env.find_binary(op) {
         Ok(Function { priority, .. }) => Some((priority * 2, priority * 2 + 1)),
         _ => None,
     }
 }
 
-fn prefix_binding_power(op: &str, env: &env::Env) -> Option<u16> {
+fn prefix_op_priority(op: &str, env: &env::Env) -> Option<u16> {
     match env.find_unary(op) {
         Ok(Function { priority, .. }) => Some(priority * 2 + 1),
         _ => None,
