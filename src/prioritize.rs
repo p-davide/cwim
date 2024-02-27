@@ -27,14 +27,8 @@ impl Priority {
         }
     }
 
-    pub const fn min() -> Self {
-        Self {
-            op_priority: 0,
-            spaces: 0xffff,
-        }
-    }
-    pub fn space(&mut self) -> Self {
-        self.spaces += 1;
-        *self
-    }
+    pub const MIN: Self = Self {
+        op_priority: 0,
+        spaces: 0xffff,
+    };
 }

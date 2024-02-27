@@ -1,4 +1,4 @@
-use crate::{env::Env, interpreter::Expr, token::*};
+use crate::{env::Env, token::*};
 
 pub type Parsed<T> = Result<T, String>;
 type Expression<'a> = Vec<Token<'a>>;
@@ -168,8 +168,8 @@ fn parse_identifier(text: &str) -> Parsed<&str> {
 
 fn parse_known_identifier<'a>(text: &'a str, env: &Env) -> Parsed<Token<'a>> {
     let lexeme = parse_identifier(text)?;
-    match env.find_unary_or_literal(lexeme) {
-        Ok(Expr::Literal(n)) => Ok(Token::new(TokenType::Literal(n), lexeme)),
+    match env.get(lexeme) {
+        Some(crate::env::Variable::Value(n)) => Ok(Token::new(TokenType::Literal(*n), lexeme)),
         _ => Ok(Token::new(TokenType::Identifier, lexeme)),
     }
 }

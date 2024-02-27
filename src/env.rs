@@ -110,26 +110,24 @@ impl Env {
         }
     }
 
-    pub fn find_unary_or_literal(&self, l: &str) -> Parsed<Expr> {
+    pub fn find_unary(&self, l: &str) -> Parsed<Expr> {
         let var = self.inner.get(l);
         match var {
             Some(Variable::Function(Functions {
                 binary: _,
                 unary: Some(unary),
             })) => Ok(Expr::Function(*unary)),
-            Some(Variable::Value(n)) => Ok(Expr::Literal(*n)),
             _ => Err(format!("Can't find '{}'", l)),
         }
     }
 
-    pub fn find_binary_or_literal(&self, l: &str) -> Parsed<Expr> {
+    pub fn find_binary(&self, l: &str) -> Parsed<Expr> {
         let var = self.inner.get(l);
         match var {
             Some(Variable::Function(Functions {
                 unary: _,
                 binary: Some(binary),
             })) => Ok(Expr::Function(*binary)),
-            Some(Variable::Value(n)) => Ok(Expr::Literal(*n)),
             _ => Err(format!("Can't find '{}'", l)),
         }
     }

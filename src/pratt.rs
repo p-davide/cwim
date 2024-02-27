@@ -2,7 +2,7 @@ use crate::env;
 use crate::function::Function;
 use crate::function::MUL;
 use crate::interpreter;
-use crate::interpreter::Expr;
+
 use crate::prioritize::Priority;
 use crate::s::S;
 use crate::token::Token;
@@ -13,7 +13,7 @@ use crate::token::TokenType;
 pub fn expr<'a>(lexer: &mut Vec<Token<'a>>, env: &env::Env) -> S<'a> {
     lexer.reverse();
     pop_trailing_space(lexer);
-    expr_bp(lexer, env, Priority::min())
+    expr_bp(lexer, env, Priority::MIN)
 }
 
 fn pop_trailing_space<'a>(lexer: &mut Vec<Token<'a>>) -> Option<Token<'a>> {
@@ -77,6 +77,18 @@ fn get_prefix_by_name(name: &str, env: &env::Env) -> Function {
     }
 }
 
+fn rhs<'a>(lexer: &mut Vec<Token<'a>>, env: &env::Env, right: u16) -> S<'a> {
+    let spaces = pop_trailing_space(lexer).map_or(0, |it| it.lexeme.len() as u16);
+    expr_bp(
+        lexer,
+        env,
+        Priority {
+            spaces,
+            op_priority: right,
+        },
+    )
+}
+
 fn expr_bp<'a>(lexer: &mut Vec<Token<'a>>, env: &env::Env, min_binding: Priority) -> S<'a> {
     let mut lhs = match lexer.pop() {
         Some(t) => match t.ttype {
@@ -84,20 +96,12 @@ fn expr_bp<'a>(lexer: &mut Vec<Token<'a>>, env: &env::Env, min_binding: Priority
             TokenType::Symbol => {
                 let ((), right) = prefix_binding_power(t.lexeme, env)
                     .expect(&format!("unknown prefix operator {}", t.lexeme));
-                let spaces = pop_trailing_space(lexer).map_or(0, |it| it.lexeme.len() as u16);
-                let rhs = expr_bp(
-                    lexer,
-                    env,
-                    Priority {
-                        spaces,
-                        op_priority: right,
-                    },
-                );
+                let rhs = rhs(lexer, env, right);
                 S::Fun(get_prefix_by_name(t.lexeme, env), vec![rhs])
             }
             TokenType::LParen => {
                 pop_trailing_space(lexer);
-                let lhs = expr_bp(lexer, env, Priority::min());
+                let lhs = expr_bp(lexer, env, Priority::MIN);
                 // eof is assumed to close every (, such that eg -(5-6 = 1
                 pop_trailing_space(lexer);
                 assert_eq!(
@@ -108,22 +112,15 @@ fn expr_bp<'a>(lexer: &mut Vec<Token<'a>>, env: &env::Env, min_binding: Priority
             }
             // TODO: This assumes every name is of a unary prefix function.
             //       Functions with more args should be supported.
-            TokenType::Identifier => match env.find_unary_or_literal(t.lexeme) {
-                Ok(Expr::Function(_)) => {
-                    let ((), right) = prefix_binding_power(t.lexeme, env)
-                        .expect(&format!("unknown prefix operator {}", t.lexeme));
-                    let spaces = pop_trailing_space(lexer).map_or(0, |it| it.lexeme.len() as u16);
-                    let rhs = expr_bp(
-                        lexer,
-                        env,
-                        Priority {
-                            spaces,
-                            op_priority: right,
-                        },
-                    );
+            TokenType::Identifier => match env.get(t.lexeme) {
+                Some(env::Variable::Function(fs)) => {
+                    let rhs = match fs.unary.map(|it| it.priority * 2 + 1) {
+                        Some(right) => rhs(lexer, env, right),
+                        None => panic!("expected function"),
+                    };
                     S::Fun(get_prefix_by_name(t.lexeme, env), vec![rhs])
                 }
-                Ok(Expr::Literal(n)) => S::Var(n),
+                Some(env::Variable::Value(n)) => S::Var(*n),
                 _ => S::Unknown(t.lexeme),
             },
             _ => unreachable!("unexpected token {:?}, lexer state: {:?}", t.lexeme, lexer),
@@ -133,9 +130,6 @@ fn expr_bp<'a>(lexer: &mut Vec<Token<'a>>, env: &env::Env, min_binding: Priority
 
     loop {
         let (spaces, maybe_token) = spaced_infix(lexer);
-        if spaces > min_binding.spaces {
-            break;
-        }
         let (spaces, op) = match maybe_token {
             None => break,
             Some(t) => {
@@ -147,22 +141,11 @@ fn expr_bp<'a>(lexer: &mut Vec<Token<'a>>, env: &env::Env, min_binding: Priority
                     TokenType::Literal(_) => (spaces, "*"),
                     TokenType::Identifier => match env.get(t.lexeme) {
                         Some(env::Variable::Function(fs)) => {
-                            match fs.unary.map(|it| it.priority * 2 + 1) {
-                                Some(right) => {
-                                    let spaces = pop_trailing_space(lexer)
-                                        .map_or(0, |it| it.lexeme.len() as u16);
-                                    let rhs = expr_bp(
-                                        lexer,
-                                        env,
-                                        Priority {
-                                            spaces,
-                                            op_priority: right,
-                                        },
-                                    );
-                                    return S::Fun(MUL, vec![lhs, rhs]);
-                                }
-                                None => panic!("expected function, found {}", t.lexeme),
-                            }
+                            let rhs = match fs.unary.map(|it| it.priority * 2 + 1) {
+                                Some(right) => rhs(lexer, env, right),
+                                None => panic!("expected function"),
+                            };
+                            return S::Fun(MUL, vec![lhs, rhs]);
                         }
                         Some(env::Variable::Value(n)) => return S::Var(*n),
                         None => (spaces, "*"),
@@ -198,7 +181,7 @@ fn expr_bp<'a>(lexer: &mut Vec<Token<'a>>, env: &env::Env, min_binding: Priority
 }
 
 fn infix_binding_power(op: &str, env: &env::Env) -> Option<(u16, u16)> {
-    match env.find_binary_or_literal(op) {
+    match env.find_binary(op) {
         Ok(interpreter::Expr::Function(f)) => {
             let it = f.priority;
             Some((it * 2, it * 2 + 1))
@@ -208,7 +191,7 @@ fn infix_binding_power(op: &str, env: &env::Env) -> Option<(u16, u16)> {
 }
 
 fn prefix_binding_power(op: &str, env: &env::Env) -> Option<((), u16)> {
-    match env.find_unary_or_literal(op) {
+    match env.find_unary(op) {
         Ok(interpreter::Expr::Function(f)) => {
             let it = f.priority;
             Some(((), it * 2 + 1))

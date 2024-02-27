@@ -142,7 +142,7 @@ fn _double_unary() {
 #[test]
 fn _1st_deg_poly() {
     let mut env = Env::prelude();
-    run("7x = 14", &mut env);
+    let _ = run("7x = 14", &mut env);
     assert_eq!(
         env.find_value("x"),
         Ok(cwim::interpreter::Expr::Literal(2.))
@@ -152,7 +152,7 @@ fn _1st_deg_poly() {
 #[test]
 fn _fwefw() {
     let mut env = Env::prelude();
-    run("7y+5y = 12", &mut env);
+    let _ = run("7y+5y = 12", &mut env);
     assert_eq!(
         env.find_value("y"),
         Ok(cwim::interpreter::Expr::Literal(1.))
@@ -163,7 +163,7 @@ fn _fwefw() {
 #[test]
 fn _assignment() {
     let mut env = Env::prelude();
-    run("x = 6", &mut env);
+    let _ = run("x = 6", &mut env);
     assert_eq!(
         env.find_value("x"),
         Ok(cwim::interpreter::Expr::Literal(6.))
