@@ -4,7 +4,6 @@ use crate::parser::*;
 use crate::pratt;
 use crate::s;
 use crate::s::polynomial;
-use crate::s::Polynomial;
 use std::fmt::Debug;
 use std::fmt::Formatter;
 
@@ -31,15 +30,18 @@ pub fn run(text: &str, env: &mut Env) -> Parsed<f64> {
         Stmt::Expr(mut tks) => Ok(s::eval(&pratt::expr(&mut tks, env))),
         Stmt::Assignment(mut lhs, mut rhs) => {
             let expr = pratt::expr(&mut lhs, env);
-            if let Some(p) = polynomial(&expr, env) {
+            if let Some(mut p) = polynomial(&expr, env) {
+                // example: in x^2 + 2x = 6+5, result = 11
                 let result = s::eval(&pratt::expr(&mut rhs, env));
-                let p2 = p.add(&Polynomial::new("", -result));
-                match env.assign(
-                    p.unknown.to_owned(),
-                    p2.zeros()[0], // TODO: Allow multiple solutions to be assigned.
-                ) {
-                    Some(_) => Err(format!("{} already exists", p.unknown)),
-                    None => Ok(result),
+                p += -result;
+                // TODO: Allow multiple solutions to be assigned.
+                if let Some(zero) = p.zeros().pop() {
+                    match env.assign(p.unknown.to_owned(), zero) {
+                        Some(_) => Err(format!("{} already exists", p.unknown)),
+                        None => Ok(zero),
+                    }
+                } else {
+                    return Err("no solution found".to_owned());
                 }
             } else {
                 Err("invalid polynomial".to_owned())

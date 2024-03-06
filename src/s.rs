@@ -2,7 +2,11 @@ use crate::{
     env,
     function::{Function, ADD, MUL, POW, SUB},
 };
-use std::{fmt, iter::repeat, ops};
+use std::{
+    fmt,
+    iter::{repeat, zip},
+    ops,
+};
 
 #[derive(Clone, Debug, PartialEq)]
 pub enum S<'a> {
@@ -58,31 +62,6 @@ impl<'a> Polynomial<'a> {
             panic!("two different unknowns: {}, {}", self.unknown, name)
         };
     }
-    pub fn add(&self, other: &Self) -> Self {
-        if self.coefs.len() > other.coefs.len() {
-            return other.add(self);
-        }
-        let xs = self.coefs.iter().chain(repeat(&0.));
-        let ys = other.coefs.iter();
-        let coefs = xs.zip(ys).map(|(x, y)| x + y).collect();
-        let mut result = Self { coefs, ..*self };
-        result.set_unknown(other.unknown);
-        result
-    }
-    pub fn mul(&self, other: &Self) -> Self {
-        let mut result = vec![0_f64; self.coefs.len() + other.coefs.len() - 1];
-        for (d1, c1) in self.coefs.iter().enumerate() {
-            for (d2, c2) in other.coefs.iter().enumerate() {
-                result[d1 + d2] += c1 * c2;
-            }
-        }
-        let mut result = Self {
-            coefs: result,
-            ..*self
-        };
-        result.set_unknown(other.unknown);
-        result
-    }
     pub fn zeros(&self) -> Vec<f64> {
         match &self.coefs[..] {
             &[] => panic!("empty polynomial"),
@@ -99,6 +78,72 @@ impl<'a> Polynomial<'a> {
             // TODO: higher order polynomials
             _ => vec![],
         }
+    }
+}
+
+impl<'a> ops::Add<Self> for &Polynomial<'a> {
+    type Output = Polynomial<'a>;
+    fn add(self, other: Self) -> Self::Output {
+        let (longest, shortest) = if self.coefs.len() > other.coefs.len() {
+            (&(self.coefs), &(other.coefs))
+        } else {
+            (&(other.coefs), &(self.coefs))
+        };
+        let coefs = zip(longest.iter(), shortest.iter().chain(repeat(&0.)))
+            .map(|(x, y)| x + y)
+            .collect();
+        let mut result = Polynomial { coefs, ..*self };
+        result.set_unknown(other.unknown);
+        result
+    }
+}
+
+impl<'a> ops::AddAssign<&Self> for Polynomial<'a> {
+    fn add_assign(&mut self, rhs: &Self) {
+        let result = &*self + rhs;
+        self.coefs = result.coefs;
+        self.unknown = result.unknown;
+    }
+}
+
+impl<'a> ops::Mul<Self> for &Polynomial<'a> {
+    type Output = Polynomial<'a>;
+    fn mul(self, other: Self) -> Self::Output {
+        let mut result = vec![0_f64; self.coefs.len() + other.coefs.len() - 1];
+        for (d1, c1) in self.coefs.iter().enumerate() {
+            for (d2, c2) in other.coefs.iter().enumerate() {
+                result[d1 + d2] += c1 * c2;
+            }
+        }
+        let mut result = Polynomial {
+            coefs: result,
+            ..*self
+        };
+        result.set_unknown(other.unknown);
+        result
+    }
+}
+
+impl<'a> ops::MulAssign<&Self> for Polynomial<'a> {
+    fn mul_assign(&mut self, rhs: &Self) {
+        let result = &*self * &rhs;
+        self.coefs = result.coefs;
+        self.unknown = result.unknown;
+    }
+}
+
+impl<'a> ops::Add<f64> for Polynomial<'a> {
+    type Output = Self;
+    fn add(self, other: f64) -> Self::Output {
+        let mut result = self.clone();
+        result += other;
+        result
+    }
+}
+
+impl<'a> ops::AddAssign<f64> for Polynomial<'a> {
+    fn add_assign(&mut self, other: f64) {
+        self.coefs[0] += other;
     }
 }
 
@@ -120,19 +165,19 @@ pub fn polynomial<'a>(s: &S<'a>, env: &env::Env) -> Option<Polynomial<'a>> {
             if f == &ADD {
                 let mut result = Polynomial::new("", 0.);
                 for s in ss {
-                    result = result.add(&polynomial(s, env)?);
+                    result += &polynomial(s, env)?;
                 }
                 Some(result)
             } else if f == &SUB {
                 let mut result = Polynomial::new("", 0.);
                 for s in ss {
-                    result = result.add(&-polynomial(s, env)?);
+                    result += &-polynomial(s, env)?;
                 }
                 Some(result)
             } else if f == &MUL {
                 let mut result = Polynomial::new("", 1.);
                 for s in ss {
-                    result = result.mul(&polynomial(s, env)?);
+                    result *= &polynomial(s, env)?;
                 }
                 Some(result)
             } else if f == &POW {
@@ -145,7 +190,7 @@ pub fn polynomial<'a>(s: &S<'a>, env: &env::Env) -> Option<Polynomial<'a>> {
                 let base = polynomial(&ss[0], env)?;
                 let mut result = Polynomial::new("", 1.);
                 for _ in 0..exp {
-                    result = result.mul(&base);
+                    result *= &base;
                 }
                 Some(result)
             } else {
