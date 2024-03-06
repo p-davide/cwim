@@ -149,16 +149,6 @@ fn _1st_deg_poly() {
     );
 }
 
-#[test]
-fn _fwefw() {
-    let mut env = Env::prelude();
-    let _ = run("7y+5y = 12", &mut env);
-    assert_eq!(
-        env.find_value("y"),
-        Ok(cwim::interpreter::Expr::Literal(1.))
-    );
-}
-
 // TODO: Test assignments more.
 #[test]
 fn _assignment() {
@@ -167,5 +157,20 @@ fn _assignment() {
     assert_eq!(
         env.find_value("x"),
         Ok(cwim::interpreter::Expr::Literal(6.))
+    );
+    let _ = run("7z+5z = 12", &mut env);
+    assert_eq!(
+        env.find_value("z"),
+        Ok(cwim::interpreter::Expr::Literal(1.))
+    );
+}
+
+#[test]
+fn _assignment2() {
+    let mut env = Env::prelude();
+    let _ = run("(sin pi/2)y=1", &mut env);
+    assert_eq!(
+        env.find_value("y"),
+        Ok(cwim::interpreter::Expr::Literal(1.))
     );
 }

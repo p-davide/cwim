@@ -31,7 +31,7 @@ pub fn run(text: &str, env: &mut Env) -> Parsed<f64> {
         Stmt::Expr(mut tks) => Ok(s::eval(&pratt::expr(&mut tks, env))),
         Stmt::Assignment(mut lhs, mut rhs) => {
             let expr = pratt::expr(&mut lhs, env);
-            if let Some(p) = polynomial(&expr) {
+            if let Some(p) = polynomial(&expr, env) {
                 let result = s::eval(&pratt::expr(&mut rhs, env));
                 let p2 = p.add(&Polynomial::new("", -result));
                 match env.assign(

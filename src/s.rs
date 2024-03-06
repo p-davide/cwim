@@ -1,4 +1,7 @@
-use crate::function::Function;
+use crate::{
+    env,
+    function::{Function, ADD, MUL, POW, SUB},
+};
 use std::{fmt, iter::repeat, ops};
 
 #[derive(Clone, Debug, PartialEq)]
@@ -38,6 +41,7 @@ pub struct Polynomial<'a> {
     coefs: Vec<f64>,
 }
 
+// The 1st element gives the 0th grade coefficient
 impl<'a> Polynomial<'a> {
     pub fn new(unknown: &'a str, n: f64) -> Self {
         Self {
@@ -61,10 +65,7 @@ impl<'a> Polynomial<'a> {
         let xs = self.coefs.iter().chain(repeat(&0.));
         let ys = other.coefs.iter();
         let coefs = xs.zip(ys).map(|(x, y)| x + y).collect();
-        let mut result = Self {
-            coefs,
-            ..*self
-        };
+        let mut result = Self { coefs, ..*self };
         result.set_unknown(other.unknown);
         result
     }
@@ -112,47 +113,46 @@ impl<'a> ops::Neg for Polynomial<'a> {
     }
 }
 
-pub fn polynomial<'a>(s: &S<'a>) -> Option<Polynomial<'a>> {
+pub fn polynomial<'a>(s: &S<'a>, env: &env::Env) -> Option<Polynomial<'a>> {
     match s {
         S::Var(n) => Some(Polynomial::new("", *n)),
-        S::Fun(f, ss) => match f.name {
-            "+" => {
+        S::Fun(f, ss) => {
+            if f == &ADD {
                 let mut result = Polynomial::new("", 0.);
                 for s in ss {
-                    result = result.add(&polynomial(s)?);
+                    result = result.add(&polynomial(s, env)?);
                 }
                 Some(result)
-            }
-            "-" => {
+            } else if f == &SUB {
                 let mut result = Polynomial::new("", 0.);
                 for s in ss {
-                    result = result.add(&-polynomial(s)?);
+                    result = result.add(&-polynomial(s, env)?);
                 }
                 Some(result)
-            }
-            "*" => {
+            } else if f == &MUL {
                 let mut result = Polynomial::new("", 1.);
                 for s in ss {
-                    result = result.mul(&polynomial(s)?);
+                    result = result.mul(&polynomial(s, env)?);
                 }
                 Some(result)
-            }
-            "^" => {
+            } else if f == &POW {
                 let fexp: f64 = ss.iter().skip(1).map(eval).sum();
                 let exp = if fexp.fract() == 0.0 {
                     fexp as usize
                 } else {
                     return None;
                 };
-                let base = polynomial(&ss[0])?;
+                let base = polynomial(&ss[0], env)?;
                 let mut result = Polynomial::new("", 1.);
                 for _ in 0..exp {
                     result = result.mul(&base);
                 }
                 None
             }
-            _ => None,
-        },
+            else {
+                Some(Polynomial::new("", (f.f)(ss.iter().map(eval).collect())))
+            }
+        }
         S::Unknown(name) => Some(Polynomial {
             unknown: *name,
             coefs: vec![0., 1.],
