@@ -147,9 +147,8 @@ pub fn polynomial<'a>(s: &S<'a>, env: &env::Env) -> Option<Polynomial<'a>> {
                 for _ in 0..exp {
                     result = result.mul(&base);
                 }
-                None
-            }
-            else {
+                Some(result)
+            } else {
                 Some(Polynomial::new("", (f.f)(ss.iter().map(eval).collect())))
             }
         }
