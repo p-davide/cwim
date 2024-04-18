@@ -124,6 +124,12 @@ impl<'a> AddAssign<Number> for Polynomial<'a> {
     }
 }
 
+impl<'a> SubAssign<Number> for Polynomial<'a> {
+    fn sub_assign(&mut self, other: Number) {
+        self.coefs[0] = &self.coefs[0] - &other;
+    }
+}
+
 impl<'a> Neg for Polynomial<'a> {
     type Output = Self;
 

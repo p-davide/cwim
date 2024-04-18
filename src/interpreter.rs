@@ -34,7 +34,7 @@ pub fn run(text: &str, env: &mut Env) -> Parsed<Number> {
             let mut p = polynomial(&expr, env)?;
             // example: in x^2 + 2x = 6+5, result = 11
             let result = s::eval(&pratt::expr(&mut rhs, env)?);
-            p += -&result;
+            p -= result;
             // TODO: Allow multiple solutions to be assigned.
             let zeros = p.zeros();
             if !zeros.inner.is_empty() {
