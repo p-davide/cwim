@@ -80,15 +80,21 @@ fn rhs<'a>(lexer: &mut Vec<Token<'a>>, env: &'a env::Env, right: u16) -> Parsed<
     )
 }
 
-fn expr_bp<'a>(lexer: &mut Vec<Token<'a>>, env: &'a env::Env, min_priority: Priority) -> Parsed<S<'a>> {
+fn expr_bp<'a>(
+    lexer: &mut Vec<Token<'a>>,
+    env: &'a env::Env,
+    min_priority: Priority,
+) -> Parsed<S<'a>> {
     let mut lhs = match lexer.pop() {
         Some(t) => match t.ttype {
             TokenType::Literal(n) => S::Var(Number::scalar(n)),
             TokenType::Symbol => {
-                let right = prefix_op_priority(t.lexeme, env)
-                    .expect(&format!("unknown prefix operator {}", t.lexeme));
-                let rhs = rhs(lexer, env, right)?;
-                S::Fun(get_prefix_by_name(t.lexeme, env), vec![rhs])
+                if let Some(right) = prefix_op_priority(t.lexeme, env) {
+                    let rhs = rhs(lexer, env, right)?;
+                    S::Fun(get_prefix_by_name(t.lexeme, env), vec![rhs])
+                } else {
+                    return Err(format!("unknown prefix operator {}", t.lexeme));
+                }
             }
             TokenType::LParen => {
                 pop_if_space(lexer);
@@ -111,14 +117,12 @@ fn expr_bp<'a>(lexer: &mut Vec<Token<'a>>, env: &'a env::Env, min_priority: Prio
                     };
                     S::Fun(get_prefix_by_name(t.lexeme, env), vec![rhs])
                 }
-                Some(env::Variable::Value(n)) => {
-                    S::Var(n.clone())
-                },
+                Some(env::Variable::Value(n)) => S::Var(n.clone()),
                 _ => S::Unknown(t.lexeme),
             },
-            _ => unreachable!("unexpected token {:?}, lexer state: {:?}", t.lexeme, lexer),
+            _ => return Err(format!("unexpected token {:?}", t.lexeme)),
         },
-        None => unreachable!("empty lexer"),
+        None => return Err("Expected expression, found end of line".to_owned()),
     };
 
     loop {
