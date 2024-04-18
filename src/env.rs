@@ -1,50 +1,51 @@
 use crate::function::*;
 use crate::interpreter::Expr;
+use crate::number::Number;
 use crate::parser::Parsed;
 
 #[derive(Debug)]
-pub enum Variable {
-    Function(Functions),
-    Value(f64),
+pub enum Variable<'f> {
+    Function(Functions<'f>),
+    Value(Number),
 }
 
 #[derive(Debug)]
-pub struct Functions {
-    pub unary: Option<Function>,
-    pub binary: Option<Function>,
+pub struct Functions<'f> {
+    pub unary: Option<Function<'f>>,
+    pub binary: Option<Function<'f>>,
 }
 
-impl Functions {
-    fn unary(unary: Function) -> Self {
+impl<'f> Functions<'f> {
+    fn unary(unary: Function<'f>) -> Self {
         Self {
             unary: Some(unary),
             binary: None,
         }
     }
-    fn binary(binary: Function) -> Self {
+    fn binary(binary: Function<'f>) -> Self {
         Self {
             binary: Some(binary),
             unary: None,
         }
     }
 }
-pub struct Env {
-    inner: std::collections::HashMap<String, Variable>,
+pub struct Env<'f> {
+    inner: std::collections::HashMap<String, Variable<'f>>,
 }
 
-fn binary(symbol: &'static str, f: Function) -> (String, Variable) {
+fn binary<'f>(symbol: &'static str, f: Function<'f>) -> (String, Variable<'f>) {
     (symbol.to_owned(), Variable::Function(Functions::binary(f)))
 }
 
-fn unary(symbol: &'static str, f: Function) -> (String, Variable) {
+fn unary<'f>(symbol: &'static str, f: Function<'f>) -> (String, Variable<'f>) {
     (symbol.to_owned(), Variable::Function(Functions::unary(f)))
 }
 
-fn value(symbol: &'static str, n: f64) -> (String, Variable) {
+fn value(symbol: &'static str, n: Number) -> (String, Variable) {
     (symbol.to_owned(), Variable::Value(n))
 }
 
-impl Env {
+impl<'f> Env<'f> {
     pub fn prelude() -> Self {
         Self {
             inner: std::collections::HashMap::from([
@@ -68,7 +69,7 @@ impl Env {
                 binary("%", REM),
                 unary("sqrt", SQRT),
                 unary("cbrt", CBRT),
-                value("pi", std::f64::consts::PI),
+                value("pi", Number{inner: vec![std::f64::consts::PI]}),
                 unary("cos", COS),
                 unary("sin", SIN),
                 unary("tan", TAN),
@@ -101,7 +102,7 @@ impl Env {
     pub fn find_value(&self, l: &str) -> Parsed<Expr> {
         let var = self.inner.get(l);
         match var {
-            Some(Variable::Value(n)) => Ok(Expr::Literal(*n)),
+            Some(Variable::Value(n)) => Ok(Expr::Literal(n.clone())),
             Some(Variable::Function(_)) => Err(format!(
                 "Expected value '{}', found function with that name.",
                 l
@@ -132,7 +133,7 @@ impl Env {
         }
     }
 
-    pub fn assign(&mut self, lhs: String, rhs: f64) -> Option<Variable> {
-        self.inner.insert(lhs, Variable::Value(rhs))
+    pub fn assign(&mut self, lhs: String, rhs: &Number) -> Option<Variable> {
+        self.inner.insert(lhs, Variable::Value(rhs.clone()))
     }
 }

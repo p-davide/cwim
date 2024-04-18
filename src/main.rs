@@ -10,7 +10,7 @@ fn run_line(line: &str, env: &mut Env) {
     match run(line, env) {
         Ok(result) => {
             println!("{}", result);
-            env.assign("ans".to_owned(), result);
+            env.assign("ans".to_owned(), &result);
         }
         Err(msg) => eprintln!("{}", msg),
     }
