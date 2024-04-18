@@ -42,14 +42,9 @@ pub fn parse<'a>(text: &'a str, env: &Env) -> Parsed<Stmt<'a>> {
 }
 
 fn parse_token<'a>(text: &'a str, env: &Env) -> Parsed<Token<'a>> {
-    let c = text.chars().next().ok_or("Tried to parse empty token")?;
-    if c.is_ascii_digit() {
-        return parse_number(text);
-    }
-    if c.is_ascii_alphabetic() {
-        return parse_known_identifier(text, env);
-    }
-    match c {
+    match text.chars().next().ok_or("Tried to parse empty token")? {
+        c if c.is_ascii_digit() => parse_number(text),
+        c if c.is_ascii_alphabetic() => parse_identifier(text),
         '-' => parse_symbol(text),
         ' ' => parse_spaces(text),
         '\n' => parse_newline(text),
@@ -60,13 +55,8 @@ fn parse_token<'a>(text: &'a str, env: &Env) -> Parsed<Token<'a>> {
         ',' => parse_comma(text),
         ';' => parse_semicolon(text),
         '#' => parse_comment(text),
-        _ => {
-            if SYMBOLS.contains(c) {
-                parse_symbol(text)
-            } else {
-                Err(format!("Can't parse '{}'", c))
-            }
-        }
+        c if SYMBOLS.contains(c) => parse_symbol(text),
+        c => Err(format!("Can't parse '{}'", c)),
     }
 }
 
@@ -151,7 +141,7 @@ fn parse_number(text: &str) -> Parsed<Token> {
     }
 }
 
-fn parse_identifier(text: &str) -> Parsed<&str> {
+fn parse_identifier(text: &str) -> Parsed<Token> {
     let mut l: usize = 0;
     for c in text.chars() {
         if c.is_ascii_alphabetic() {
@@ -163,15 +153,10 @@ fn parse_identifier(text: &str) -> Parsed<&str> {
     if l == 0 {
         return Err("empty identifier".to_owned());
     }
-    Ok(&text[..l])
-}
-
-fn parse_known_identifier<'a>(text: &'a str, env: &Env) -> Parsed<Token<'a>> {
-    let lexeme = parse_identifier(text)?;
-    match env.get(lexeme) {
-        Some(crate::env::Variable::Value(n)) => Ok(Token::new(TokenType::Literal(*n), lexeme)),
-        _ => Ok(Token::new(TokenType::Identifier, lexeme)),
-    }
+    Ok(Token {
+        ttype: TokenType::Identifier,
+        lexeme: &text[..l],
+    })
 }
 
 fn parse_symbol(text: &str) -> Parsed<Token> {
