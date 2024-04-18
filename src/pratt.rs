@@ -2,6 +2,8 @@ use crate::env;
 use crate::function::Function;
 use crate::function::MUL;
 
+use crate::number::Number;
+use crate::parser::Parsed;
 use crate::prioritize::Priority;
 use crate::s::S;
 use crate::token::Token;
@@ -9,7 +11,7 @@ use crate::token::TokenType;
 
 // Modified from https://github.com/matklad/minipratt
 
-pub fn expr<'a>(lexer: &mut Vec<Token<'a>>, env: &env::Env) -> S<'a> {
+pub fn expr<'a>(lexer: &mut Vec<Token<'a>>, env: &'a env::Env) -> Parsed<S<'a>> {
     lexer.reverse();
     pop_if_space(lexer);
     expr_bp(lexer, env, Priority::MIN)
@@ -56,17 +58,17 @@ fn spaced_infix<'a>(lexer: &mut Vec<Token<'a>>) -> (u16, Option<Token<'a>>) {
     (std::cmp::max(pre_spaces, post_spaces), maybe_token)
 }
 
-fn get_infix_by_name(name: &str, env: &env::Env) -> Function {
+fn get_infix_by_name<'f>(name: &str, env: &'f env::Env) -> Function<'f> {
     env.find_binary(name)
         .expect(&format!("Binary {} not found", name))
 }
 
-fn get_prefix_by_name(name: &str, env: &env::Env) -> Function {
+fn get_prefix_by_name<'f>(name: &str, env: &'f env::Env) -> Function<'f> {
     env.find_unary(name)
         .expect(&format!("Unary {} not found", name))
 }
 
-fn rhs<'a>(lexer: &mut Vec<Token<'a>>, env: &env::Env, right: u16) -> S<'a> {
+fn rhs<'a>(lexer: &mut Vec<Token<'a>>, env: &'a env::Env, right: u16) -> Parsed<S<'a>> {
     let spaces = pop_if_space(lexer).map_or(0, |it| it.lexeme.len() as u16);
     expr_bp(
         lexer,
@@ -78,19 +80,19 @@ fn rhs<'a>(lexer: &mut Vec<Token<'a>>, env: &env::Env, right: u16) -> S<'a> {
     )
 }
 
-fn expr_bp<'a>(lexer: &mut Vec<Token<'a>>, env: &env::Env, min_priority: Priority) -> S<'a> {
+fn expr_bp<'a>(lexer: &mut Vec<Token<'a>>, env: &'a env::Env, min_priority: Priority) -> Parsed<S<'a>> {
     let mut lhs = match lexer.pop() {
         Some(t) => match t.ttype {
-            TokenType::Literal(n) => S::Var(n),
+            TokenType::Literal(n) => S::Var(Number::scalar(n)),
             TokenType::Symbol => {
                 let right = prefix_op_priority(t.lexeme, env)
                     .expect(&format!("unknown prefix operator {}", t.lexeme));
-                let rhs = rhs(lexer, env, right);
+                let rhs = rhs(lexer, env, right)?;
                 S::Fun(get_prefix_by_name(t.lexeme, env), vec![rhs])
             }
             TokenType::LParen => {
                 pop_if_space(lexer);
-                let lhs = expr_bp(lexer, env, Priority::MIN);
+                let lhs = expr_bp(lexer, env, Priority::MIN)?;
                 // eof is assumed to close every (, such that eg -(5-6 = 1
                 pop_if_space(lexer);
                 assert_eq!(
@@ -104,12 +106,14 @@ fn expr_bp<'a>(lexer: &mut Vec<Token<'a>>, env: &env::Env, min_priority: Priorit
             TokenType::Identifier => match env.get(t.lexeme) {
                 Some(env::Variable::Function(fs)) => {
                     let rhs = match fs.unary.map(|it| it.priority * 2 + 1) {
-                        Some(right) => rhs(lexer, env, right),
-                        None => panic!("expected function"),
+                        Some(right) => rhs(lexer, env, right)?,
+                        None => return Err("expected function".to_owned()),
                     };
                     S::Fun(get_prefix_by_name(t.lexeme, env), vec![rhs])
                 }
-                Some(env::Variable::Value(n)) => S::Var(*n),
+                Some(env::Variable::Value(n)) => {
+                    S::Var(n.clone())
+                },
                 _ => S::Unknown(t.lexeme),
             },
             _ => unreachable!("unexpected token {:?}, lexer state: {:?}", t.lexeme, lexer),
@@ -124,19 +128,21 @@ fn expr_bp<'a>(lexer: &mut Vec<Token<'a>>, env: &env::Env, min_priority: Priorit
             Some(t) => {
                 match t.ttype {
                     TokenType::Symbol | TokenType::RParen => (spaces, t.lexeme),
-                    // Finding a ( here instead of an operator means the expression is like ...2(3+...
-                    // We treat this as a multiplication.
+                    // If we don't find a binary operator here, it means we have two expressions next to each other.
+                    // Examples: (2+5) cos7; 2pi; 5+9 7
+                    // In these cases we assume that the user intended the expressions to be multiplied:
+                    // Th examples above become: (2+5)*cos7; 2*pi; 5+9 * 7
                     TokenType::LParen => (0xffff, "*"),
                     TokenType::Literal(_) => (spaces, "*"),
                     TokenType::Identifier => match env.get(t.lexeme) {
                         Some(env::Variable::Function(fs)) => {
                             let rhs = match fs.unary.map(|it| it.priority * 2 + 1) {
-                                Some(right) => rhs(lexer, env, right),
-                                None => panic!("expected function"),
+                                Some(right) => rhs(lexer, env, right)?,
+                                None => return Err("expected function".to_owned()),
                             };
-                            return S::Fun(MUL, vec![lhs, rhs]);
+                            return Ok(S::Fun(MUL, vec![lhs, rhs]));
                         }
-                        Some(env::Variable::Value(n)) => return S::Var(*n),
+                        Some(env::Variable::Value(_)) => (spaces, "*"),
                         None => (spaces, "*"),
                     },
                     t => unreachable!("{:?} with lexer state {:?}", t, lexer),
@@ -160,13 +166,13 @@ fn expr_bp<'a>(lexer: &mut Vec<Token<'a>>, env: &env::Env, min_priority: Priorit
                     spaces: std::cmp::min(min_priority.spaces, spaces),
                     op_priority: right,
                 },
-            );
+            )?;
             lhs = S::Fun(get_infix_by_name(op, env), vec![lhs, rhs]);
             continue;
         }
         break;
     }
-    lhs
+    Ok(lhs)
 }
 
 fn infix_op_priority(op: &str, env: &env::Env) -> Option<(u16, u16)> {
@@ -192,7 +198,8 @@ mod test {
         let stmt = parser::parse(input, &env::Env::prelude()).unwrap();
         match stmt {
             Stmt::Expr(mut tokens) => {
-                let actual = expr(&mut tokens, &mut env::Env::prelude());
+                let prelude = &mut env::Env::prelude();
+                let actual = expr(&mut tokens, prelude).unwrap();
                 assert_eq!(actual.to_string(), expected);
             }
             _ => panic!("expected expression"),
@@ -259,14 +266,11 @@ mod test {
         tokenize_and_parse("2 (+3+5)", "(* 2 (+ (+ 3) 5))");
     }
     #[test]
-    fn _cos_2pi() {
-        tokenize_and_parse("cos 2pi", "(cos (* 2 3.141592653589793))")
-    }
-    #[test]
     fn _unary_ordering() {
         tokenize_and_parse("cos2pi   ", "(cos (* 2 3.141592653589793))");
         tokenize_and_parse("cos 2pi  ", "(cos (* 2 3.141592653589793))");
         tokenize_and_parse("cos2 pi  ", "(* (cos 2) 3.141592653589793)");
+        tokenize_and_parse("cos2 3  ", "(* (cos 2) 3)");
         tokenize_and_parse("cos 2 pi ", "(cos (* 2 3.141592653589793))");
     }
     #[test]
@@ -280,5 +284,10 @@ mod test {
         tokenize_and_parse("7x", "(* 7 x)");
         tokenize_and_parse("7x+5y", "(+ (* 7 x) (* 5 y))");
         tokenize_and_parse("(sin1)x", "(* (sin 1) x)");
+    }
+
+    #[test]
+    fn _implied_multiplication_0() {
+        tokenize_and_parse("2pi", "(* 2 3.141592653589793)")
     }
 }
