@@ -11,7 +11,7 @@ pub struct Function<'f> {
 }
 
 #[derive(Debug, Clone, Copy)]
-pub(crate) enum F {
+pub enum F {
     Binary(fn(Number, Number) -> Number),
     Nary(fn(Number) -> Number),
 }

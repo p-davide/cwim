@@ -120,7 +120,12 @@ fn expr_bp<'a>(
                 Some(env::Variable::Value(n)) => S::Var(n.clone()),
                 _ => S::Unknown(t.lexeme),
             },
-            _ => return Err(format!("unexpected token {:?}", t.lexeme)),
+            _ => {
+                return Err(format!(
+                    "Column {}: unexpected token {:?}",
+                    t.column, t.lexeme
+                ))
+            }
         },
         None => return Err("Expected expression, found end of line".to_owned()),
     };
@@ -149,7 +154,7 @@ fn expr_bp<'a>(
                         Some(env::Variable::Value(_)) => (spaces, "*"),
                         None => (spaces, "*"),
                     },
-                    t => unreachable!("{:?} with lexer state {:?}", t, lexer),
+                    _ => return Err(format!("Column {}: {:?} was not implemented", t.column, t.lexeme)),
                 }
             }
         };

@@ -19,33 +19,38 @@ pub enum TokenType {
 pub struct Token<'t> {
     pub ttype: TokenType,
     pub lexeme: &'t str,
+    pub column: usize,
 }
 
 impl<'t> Token<'t> {
-    pub fn new(ttype: TokenType, lexeme: &'t str) -> Self {
-        Self { ttype, lexeme }
+    pub fn new(ttype: TokenType, lexeme: &'t str, column: usize) -> Self {
+        Self {
+            ttype,
+            lexeme,
+            column,
+        }
     }
 
-    pub fn lit(lit: f64, lexeme: &'t str) -> Self {
-        Self::new(TokenType::Literal(lit), lexeme)
+    pub fn lit(lit: f64, lexeme: &'t str, column: usize) -> Self {
+        Self::new(TokenType::Literal(lit), lexeme, column)
     }
 
-    pub fn sym(lexeme: &'t str) -> Self {
-        Self::new(TokenType::Symbol, lexeme)
-    }
-
-    #[cfg(test)]
-    pub fn space() -> Self {
-        Self::new(TokenType::Space, " ")
-    }
-
-    #[cfg(test)]
-    pub fn lparen() -> Self {
-        Self::new(TokenType::LParen, "(")
+    pub fn sym(lexeme: &'t str, column: usize) -> Self {
+        Self::new(TokenType::Symbol, lexeme, column)
     }
 
     #[cfg(test)]
-    pub fn rparen() -> Self {
-        Self::new(TokenType::RParen, ")")
+    pub fn space(offset: usize) -> Self {
+        Self::new(TokenType::Space, " ", offset)
+    }
+
+    #[cfg(test)]
+    pub fn lparen(offset: usize) -> Self {
+        Self::new(TokenType::LParen, "(", offset)
+    }
+
+    #[cfg(test)]
+    pub fn rparen(offset: usize) -> Self {
+        Self::new(TokenType::RParen, ")", offset)
     }
 }
