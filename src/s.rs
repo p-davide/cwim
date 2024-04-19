@@ -1,4 +1,7 @@
-use crate::function::{Function, F};
+use crate::{
+    function::{Function, F},
+    parser::Parsed,
+};
 use std::fmt;
 
 use crate::number::Number;
@@ -26,27 +29,33 @@ impl<'a> fmt::Display for S<'a> {
     }
 }
 
-pub fn eval(s: &S) -> Number {
+pub fn eval(s: &S) -> Parsed<Number> {
     match s {
-        S::Var(n) => n.clone(),
-        S::Fun(f, xs) => match f.f {
-            F::Nary(f) => f(Number {
-                inner: xs.iter().rev().map(|s| eval(s).inner[0]).collect(),
-            }),
+        S::Var(n) => Ok(n.clone()),
+        S::Fun(fun, ss) => match fun.f {
+            F::Nary(f) => {
+                let mut result = vec![];
+                for s in ss {
+                    result.push(eval(s)?.inner[0]);
+                }
+                Ok(f(Number { inner: result }))
+            }
             F::Binary(f) => {
-                if let Some(n) = xs
-                    .iter()
-                    .rev()
-                    .map(|s| Number::scalar(eval(s).inner[0]))
-                    .reduce(f)
-                {
-                    n
-                } else {
-                    Number { inner: vec![] }
+                let mut result = None;
+                for s in ss {
+                    let next = Number::scalar(eval(s)?.inner[0]);
+                    result = match result {
+                        None => Some(next),
+                        Some(curr) => Some(f(next, curr)),
+                    }
+                }
+                match result {
+                    None => Err(format!("Binary function {} was called with no arguments", fun.name)),
+                    Some(n) => Ok(n),
                 }
             }
         },
-        S::Unknown(x) => panic!("tried to evaluate unknown {}", x),
+        S::Unknown(x) => Err(format!("tried to evaluate unknown {}", x)),
     }
 }
 
@@ -76,7 +85,7 @@ mod test {
                 ),
             ],
         );
-        let stmt = parser::parse("2(+3+5)", &env::Env::prelude()).unwrap();
+        let stmt = parser::stmt("2(+3+5)", &env::Env::prelude()).unwrap();
         match stmt {
             Stmt::Expr(mut tokens) => {
                 let it = env::Env::prelude();

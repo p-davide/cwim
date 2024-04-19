@@ -26,14 +26,14 @@ impl<'f> Debug for Expr<'f> {
 }
 
 pub fn run(text: &str, env: &mut Env) -> Parsed<Number> {
-    let tks = parse(text, env)?;
+    let tks = stmt(text, env)?;
     match tks {
-        Stmt::Expr(mut tks) => Ok(s::eval(&pratt::expr(&mut tks, env)?)),
+        Stmt::Expr(mut tks) => Ok(s::eval(&pratt::expr(&mut tks, env)?)?),
         Stmt::Assignment(mut lhs, mut rhs) => {
             let expr = pratt::expr(&mut lhs, env)?;
             let mut p = polynomial(&expr, env)?;
             // example: in x^2 + 2x = 6+5, result = 11
-            let result = s::eval(&pratt::expr(&mut rhs, env)?);
+            let result = s::eval(&pratt::expr(&mut rhs, env)?)?;
             p -= result;
             // TODO: Allow multiple solutions to be assigned.
             let zeros = p.zeros();
