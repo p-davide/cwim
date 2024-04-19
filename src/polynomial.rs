@@ -6,7 +6,7 @@ use std::{
 
 use crate::{
     env,
-    function::{ADD, F, MUL, POW, SUB},
+    function::{ADD, MUL, POW, SUB},
     number::Number,
     parser::Parsed,
     s::{eval, S},
@@ -88,6 +88,34 @@ impl<'a> AddAssign<&Self> for Polynomial<'a> {
     }
 }
 
+impl<'a> Sub<Self> for &Polynomial<'a> {
+    type Output = Polynomial<'a>;
+    fn sub(self, other: Self) -> Self::Output {
+        let (longest, shortest) = if self.coefs.len() > other.coefs.len() {
+            (&(self.coefs), &(other.coefs))
+        } else {
+            (&(other.coefs), &(self.coefs))
+        };
+        let coefs = zip(
+            longest.iter(),
+            shortest.iter().chain(repeat(&Number::scalar(0.))),
+        )
+        .map(|(x, y)| x - y)
+        .collect();
+        let mut result = Polynomial { coefs, ..*self };
+        result.set_unknown(other.unknown);
+        result
+    }
+}
+
+impl<'a> SubAssign<&Self> for Polynomial<'a> {
+    fn sub_assign(&mut self, rhs: &Self) {
+        let result = &*self - rhs;
+        self.coefs = result.coefs;
+        self.unknown = result.unknown;
+    }
+}
+
 impl<'a> Mul<Self> for &Polynomial<'a> {
     type Output = Polynomial<'a>;
     fn mul(self, other: Self) -> Self::Output {
@@ -149,35 +177,34 @@ impl<'a> Neg for Polynomial<'a> {
 pub fn polynomial<'a>(s: &S<'a>, env: &env::Env) -> Parsed<Polynomial<'a>> {
     match s {
         S::Var(n) => Ok(Polynomial::new("", n.clone())),
-        S::Fun(f, ss) => {
-            if f == &ADD {
+        S::Fun(fun, ss) => {
+            if fun == &ADD {
                 let mut result = Polynomial::new("", Number::scalar(0.));
                 for s in ss {
                     result += &polynomial(s, env)?;
                 }
                 Ok(result)
-            } else if f == &SUB {
+            } else if fun == &SUB {
                 let mut result = Polynomial::new("", Number::scalar(0.));
                 for s in ss {
-                    result += &-polynomial(s, env)?;
+                    result -= &polynomial(s, env)?;
                 }
                 Ok(result)
-            } else if f == &MUL {
+            } else if fun == &MUL {
                 let mut result = Polynomial::new("", Number::scalar(1.));
                 for s in ss {
                     result *= &polynomial(s, env)?;
                 }
                 Ok(result)
-            } else if f == &POW {
+            } else if fun == &POW {
                 // TODO: Matrix exponents
-                let fexp: f64 = ss
-                    .iter()
-                    .skip(1)
-                    .map(|s| match &eval(s).inner[..] {
-                        &[n] => n,
-                        bad => panic!("Exponent should have size 1, found {:?}", bad),
-                    })
-                    .sum();
+                let mut fexp = 0f64;
+                for s in ss.iter().skip(1) {
+                    match &eval(s)?.inner[..] {
+                        &[n] => fexp += n,
+                        bad => return Err(format!("Exponent should have size 1, found {:?}", bad)),
+                    }
+                }
                 let exp = if fexp.fract() == 0.0 {
                     fexp as usize
                 } else {
@@ -190,15 +217,7 @@ pub fn polynomial<'a>(s: &S<'a>, env: &env::Env) -> Parsed<Polynomial<'a>> {
                 }
                 Ok(result)
             } else {
-                Ok(Polynomial::new(
-                    "",
-                    match f.f {
-                        F::Nary(f) => f(Number {
-                            inner: ss.iter().map(|s| eval(s).inner[0]).collect::<Vec<_>>(),
-                        }),
-                        F::Binary(f) => ss.iter().map(|s| eval(s)).reduce(f).unwrap(),
-                    },
-                ))
+                Ok(Polynomial::new("", eval(s)?))
             }
         }
         S::Unknown(name) => Ok(Polynomial {

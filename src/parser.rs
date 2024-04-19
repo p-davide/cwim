@@ -18,14 +18,14 @@ impl<'a> Stmt<'a> {
     }
 }
 
-pub fn parse<'a>(text: &'a str, env: &Env) -> Parsed<Stmt<'a>> {
+pub fn stmt<'a>(text: &'a str, env: &Env) -> Parsed<Stmt<'a>> {
     let mut tokens = vec![];
 
     let mut sides = text.split('=');
     let mut lhs = sides.next().expect("no =?");
     let mut column = 1;
     while !lhs.is_empty() {
-        let token = parse_token(lhs, env, &mut column)?;
+        let token = token(lhs, env, &mut column)?;
         tokens.push(token);
         lhs = &lhs[token.lexeme.len()..];
     }
@@ -33,7 +33,7 @@ pub fn parse<'a>(text: &'a str, env: &Env) -> Parsed<Stmt<'a>> {
         column += 1;
         let mut right_tokens = vec![];
         while !rhs.is_empty() {
-            let token = parse_token(rhs, env, &mut column)?;
+            let token = token(rhs, env, &mut column)?;
             right_tokens.push(token);
             rhs = &rhs[token.lexeme.len()..];
         }
@@ -43,28 +43,28 @@ pub fn parse<'a>(text: &'a str, env: &Env) -> Parsed<Stmt<'a>> {
     }
 }
 
-fn parse_token<'a>(text: &'a str, _env: &Env, column: &mut usize) -> Parsed<Token<'a>> {
+fn token<'a>(text: &'a str, _env: &Env, column: &mut usize) -> Parsed<Token<'a>> {
     match text.chars().next().ok_or("Tried to parse empty token")? {
-        c if c.is_ascii_digit() => parse_number(text, column),
-        c if c.is_ascii_alphabetic() => parse_identifier(text, column),
-        '-' => parse_symbol(text, column),
-        ' ' => parse_spaces(text, column),
-        '\n' => parse_newline(text, column),
-        '[' => parse_lbracket(text, column),
-        ']' => parse_rbracket(text, column),
-        '(' => parse_lparen(text, column),
-        ')' => parse_rparen(text, column),
-        ',' => parse_comma(text, column),
-        ';' => parse_semicolon(text, column),
-        '#' => parse_comment(text, column),
-        c if SYMBOLS.contains(c) => parse_symbol(text, column),
+        c if c.is_ascii_digit() => number(text, column),
+        c if c.is_ascii_alphabetic() => identifier(text, column),
+        '-' => symbol(text, column),
+        ' ' => spaces(text, column),
+        '\n' => newline(text, column),
+        '[' => lbracket(text, column),
+        ']' => rbracket(text, column),
+        '(' => lparen(text, column),
+        ')' => rparen(text, column),
+        ',' => comma(text, column),
+        ';' => semicolon(text, column),
+        '#' => comment(text, column),
+        c if SYMBOLS.contains(c) => symbol(text, column),
         c => Err(format!("Can't parse '{}'", c)),
     }
 }
 
 pub const SYMBOLS: &str = "!@$%^&*|\"';,./+-=";
 
-fn parse_char<'a>(
+fn char<'a>(
     expected: char,
     ttype: TokenType,
     text: &'a str,
@@ -79,7 +79,7 @@ fn parse_char<'a>(
     }
 }
 
-fn parse_spaces<'a>(text: &'a str, column: &mut usize) -> Parsed<Token<'a>> {
+fn spaces<'a>(text: &'a str, column: &mut usize) -> Parsed<Token<'a>> {
     let l = text.chars().take_while(|c| *c == ' ').count();
     if l == 0 {
         Err("empty space token".to_owned())
@@ -89,35 +89,35 @@ fn parse_spaces<'a>(text: &'a str, column: &mut usize) -> Parsed<Token<'a>> {
     }
 }
 
-fn parse_comma<'a>(text: &'a str, column: &mut usize) -> Parsed<Token<'a>> {
-    parse_char(',', TokenType::Comma, text, column)
+fn comma<'a>(text: &'a str, column: &mut usize) -> Parsed<Token<'a>> {
+    char(',', TokenType::Comma, text, column)
 }
 
-fn parse_semicolon<'a>(text: &'a str, column: &mut usize) -> Parsed<Token<'a>> {
-    parse_char(';', TokenType::Semicolon, text, column)
+fn semicolon<'a>(text: &'a str, column: &mut usize) -> Parsed<Token<'a>> {
+    char(';', TokenType::Semicolon, text, column)
 }
 
-fn parse_newline<'a>(text: &'a str, column: &mut usize) -> Parsed<Token<'a>> {
-    parse_char('\n', TokenType::Newline, text, column)
+fn newline<'a>(text: &'a str, column: &mut usize) -> Parsed<Token<'a>> {
+    char('\n', TokenType::Newline, text, column)
 }
 
-fn parse_lbracket<'a>(text: &'a str, column: &mut usize) -> Parsed<Token<'a>> {
-    parse_char('[', TokenType::LBracket, text, column)
+fn lbracket<'a>(text: &'a str, column: &mut usize) -> Parsed<Token<'a>> {
+    char('[', TokenType::LBracket, text, column)
 }
 
-fn parse_rbracket<'a>(text: &'a str, column: &mut usize) -> Parsed<Token<'a>> {
-    parse_char(']', TokenType::RBracket, text, column)
+fn rbracket<'a>(text: &'a str, column: &mut usize) -> Parsed<Token<'a>> {
+    char(']', TokenType::RBracket, text, column)
 }
 
-fn parse_lparen<'a>(text: &'a str, column: &mut usize) -> Parsed<Token<'a>> {
-    parse_char('(', TokenType::LParen, text, column)
+fn lparen<'a>(text: &'a str, column: &mut usize) -> Parsed<Token<'a>> {
+    char('(', TokenType::LParen, text, column)
 }
 
-fn parse_rparen<'a>(text: &'a str, column: &mut usize) -> Parsed<Token<'a>> {
-    parse_char(')', TokenType::RParen, text, column)
+fn rparen<'a>(text: &'a str, column: &mut usize) -> Parsed<Token<'a>> {
+    char(')', TokenType::RParen, text, column)
 }
 
-fn parse_comment<'a>(text: &'a str, column: &mut usize) -> Parsed<Token<'a>> {
+fn comment<'a>(text: &'a str, column: &mut usize) -> Parsed<Token<'a>> {
     let l = text.chars().take_while(|c| *c != '\n').count();
     if l == 0 {
         Err("empty comment".to_owned())
@@ -127,7 +127,7 @@ fn parse_comment<'a>(text: &'a str, column: &mut usize) -> Parsed<Token<'a>> {
     }
 }
 
-fn parse_number<'a>(text: &'a str, column: &mut usize) -> Parsed<Token<'a>> {
+fn number<'a>(text: &'a str, column: &mut usize) -> Parsed<Token<'a>> {
     let mut l: usize = 0;
     for c in text.chars() {
         if c.is_ascii_digit() || c == '.' || (l == 0 && c == '-') {
@@ -141,18 +141,17 @@ fn parse_number<'a>(text: &'a str, column: &mut usize) -> Parsed<Token<'a>> {
         return Err("minus sign not part of negative number".to_owned());
     }
     let parsed = lexeme.parse::<f64>();
-    if parsed.is_err() {
-        return Err(format!("failed to parse '{}'", lexeme));
-    }
-    if l == 0 {
-        Err("empty number".to_owned())
-    } else {
-        *column += l;
-        Ok(Token::lit(parsed.unwrap(), lexeme, *column - l))
+    match parsed {
+        Err(_) => Err(format!("failed to parse '{}'", lexeme)),
+        Ok(_) if l == 0 => Err("empty number".to_owned()),
+        Ok(n) => {
+            *column += l;
+            Ok(Token::lit(n, lexeme, *column - l))
+        }
     }
 }
 
-fn parse_identifier<'a>(text: &'a str, column: &mut usize) -> Parsed<Token<'a>> {
+fn identifier<'a>(text: &'a str, column: &mut usize) -> Parsed<Token<'a>> {
     let mut l: usize = 0;
     for c in text.chars() {
         if c.is_ascii_alphabetic() {
@@ -172,7 +171,7 @@ fn parse_identifier<'a>(text: &'a str, column: &mut usize) -> Parsed<Token<'a>> 
     })
 }
 
-fn parse_symbol<'a>(text: &'a str, column: &mut usize) -> Parsed<Token<'a>> {
+fn symbol<'a>(text: &'a str, column: &mut usize) -> Parsed<Token<'a>> {
     let actual = text.chars().next().ok_or("there should be a char here")?;
     if SYMBOLS.contains(actual) {
         *column += 1;
@@ -191,7 +190,7 @@ mod test {
     #[test]
     fn _z() {
         let input = "2 (+3+5)";
-        let actual = parse(input, &env::Env::prelude()).unwrap();
+        let actual = stmt(input, &env::Env::prelude()).unwrap();
         let expected = Stmt::Expr(vec![
             Token::lit(2., "2", 1),
             Token::space(2),
@@ -209,7 +208,7 @@ mod test {
     fn _spaces() {
         let spaces = "       ";
         assert_eq!(
-            parse(spaces, &env::Env::prelude()).unwrap(),
+            stmt(spaces, &env::Env::prelude()).unwrap(),
             Stmt::Expr(vec![Token::new(TokenType::Space, spaces, 1)])
         );
     }
@@ -217,14 +216,14 @@ mod test {
     #[test]
     fn _assignment() {
         assert_eq!(
-            parse("x=6", &env::Env::prelude()).unwrap(),
+            stmt("x=6", &env::Env::prelude()).unwrap(),
             Stmt::Assignment(
                 vec![Token::new(TokenType::Identifier, "x", 1)],
                 vec![Token::lit(6., "6", 3)]
             )
         );
         assert_eq!(
-            parse("7x+5y", &env::Env::prelude()).unwrap(),
+            stmt("7x+5y", &env::Env::prelude()).unwrap(),
             Stmt::Expr(vec![
                 Token::lit(7., "7", 1),
                 Token::new(TokenType::Identifier, "x", 2),
@@ -250,7 +249,7 @@ mod test {
             Token::sym("^", 13),
             Token::lit(3., "3", 14),
         ]));
-        assert_eq!(parse("234*5+7*8-18^3", &env::Env::prelude()), expected);
+        assert_eq!(stmt("234*5+7*8-18^3", &env::Env::prelude()), expected);
     }
 
     #[test]
@@ -264,7 +263,7 @@ mod test {
             Token::lit(6., "6", 5),
             Token::rparen(6),
         ]));
-        assert_eq!(parse(to_parse, &env::Env::prelude()), expected);
+        assert_eq!(stmt(to_parse, &env::Env::prelude()), expected);
     }
 
     #[test]
@@ -277,7 +276,7 @@ mod test {
             Token::sym("+", 4),
             Token::lit(4., "4", 5),
         ]));
-        assert_eq!(parse(to_parse, &env::Env::prelude()), expected);
+        assert_eq!(stmt(to_parse, &env::Env::prelude()), expected);
     }
 
     //" -(6) * -(6)"
@@ -285,7 +284,7 @@ mod test {
     fn _d() {
         let to_parse = " -(6) * -(6)";
         assert_eq!(
-            parse(to_parse, &env::Env::prelude()),
+            stmt(to_parse, &env::Env::prelude()),
             Ok(Stmt::Expr(vec![
                 Token::space(1),
                 Token::sym("-", 2),

@@ -35,18 +35,17 @@ impl Number {
     }
 }
 
+fn op(lhs: &Number, rhs: &Number, op: fn((&f64, &f64)) -> f64) -> Number {
+    Number {
+        inner: lhs.inner.iter().zip(rhs.inner.iter()).map(op).collect(),
+    }
+}
+
 impl Add for &Number {
     type Output = Number;
 
     fn add(self, rhs: Self) -> Self::Output {
-        Number {
-            inner: self
-                .inner
-                .iter()
-                .zip(rhs.inner.iter())
-                .map(|(x, y)| (x + y))
-                .collect(),
-        }
+        op(self, rhs, |(x, y)| (x + y))
     }
 }
 
@@ -54,14 +53,7 @@ impl Sub for &Number {
     type Output = Number;
 
     fn sub(self, rhs: Self) -> Self::Output {
-        Number {
-            inner: self
-                .inner
-                .iter()
-                .zip(rhs.inner.iter())
-                .map(|(x, y)| (x - y))
-                .collect(),
-        }
+        op(self, rhs, |(x, y)| (x - y))
     }
 }
 
@@ -69,14 +61,7 @@ impl Mul for &Number {
     type Output = Number;
 
     fn mul(self, rhs: Self) -> Self::Output {
-        Number {
-            inner: self
-                .inner
-                .iter()
-                .zip(rhs.inner.iter())
-                .map(|(x, y)| (x * y))
-                .collect(),
-        }
+        op(self, rhs, |(x, y)| (x * y))
     }
 }
 
@@ -84,14 +69,7 @@ impl Div for &Number {
     type Output = Number;
 
     fn div(self, rhs: Self) -> Self::Output {
-        Number {
-            inner: self
-                .inner
-                .iter()
-                .zip(rhs.inner.iter())
-                .map(|(x, y)| (x / y))
-                .collect(),
-        }
+        op(self, rhs, |(x, y)| (x / y))
     }
 }
 
@@ -99,14 +77,7 @@ impl Rem for &Number {
     type Output = Number;
 
     fn rem(self, rhs: Self) -> Self::Output {
-        Number {
-            inner: self
-                .inner
-                .iter()
-                .zip(rhs.inner.iter())
-                .map(|(x, y)| (x % y))
-                .collect(),
-        }
+        op(self, rhs, |(x, y)| (x % y))
     }
 }
 

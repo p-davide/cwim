@@ -209,7 +209,7 @@ mod test {
     use crate::parser::{self, Stmt};
 
     fn tokenize_and_parse(input: &str, expected: &str) {
-        let stmt = parser::parse(input, &env::Env::prelude()).unwrap();
+        let stmt = parser::stmt(input, &env::Env::prelude()).unwrap();
         match stmt {
             Stmt::Expr(mut tokens) => {
                 let prelude = &mut env::Env::prelude();

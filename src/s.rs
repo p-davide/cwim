@@ -50,7 +50,10 @@ pub fn eval(s: &S) -> Parsed<Number> {
                     }
                 }
                 match result {
-                    None => Err(format!("Binary function {} was called with no arguments", fun.name)),
+                    None => Err(format!(
+                        "Binary function {} was called with no arguments",
+                        fun.name
+                    )),
                     Some(n) => Ok(n),
                 }
             }
