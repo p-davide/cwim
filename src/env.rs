@@ -69,7 +69,12 @@ impl<'f> Env<'f> {
                 binary("%", REM),
                 unary("sqrt", SQRT),
                 unary("cbrt", CBRT),
-                value("pi", Number{inner: vec![std::f64::consts::PI]}),
+                value(
+                    "pi",
+                    Number {
+                        inner: vec![std::f64::consts::PI],
+                    },
+                ),
                 unary("cos", COS),
                 unary("sin", SIN),
                 unary("tan", TAN),

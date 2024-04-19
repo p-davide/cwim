@@ -34,10 +34,15 @@ pub fn eval(s: &S) -> Number {
                 inner: xs.iter().rev().map(|s| eval(s).inner[0]).collect(),
             }),
             F::Binary(f) => {
-                if let Some(n) = xs.iter().rev().map(|s| Number::scalar(eval(s).inner[0])).reduce(f) {
+                if let Some(n) = xs
+                    .iter()
+                    .rev()
+                    .map(|s| Number::scalar(eval(s).inner[0]))
+                    .reduce(f)
+                {
                     n
                 } else {
-                    Number {inner: vec![]}
+                    Number { inner: vec![] }
                 }
             }
         },

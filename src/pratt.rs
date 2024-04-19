@@ -154,7 +154,12 @@ fn expr_bp<'a>(
                         Some(env::Variable::Value(_)) => (spaces, "*"),
                         None => (spaces, "*"),
                     },
-                    _ => return Err(format!("Column {}: {:?} was not implemented", t.column, t.lexeme)),
+                    _ => {
+                        return Err(format!(
+                            "Column {}: {:?} was not implemented",
+                            t.column, t.lexeme
+                        ))
+                    }
                 }
             }
         };

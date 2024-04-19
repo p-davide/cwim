@@ -5,7 +5,11 @@ use std::{
 };
 
 use crate::{
-    env, function::{ADD, F, MUL, POW, SUB}, number::Number, parser::Parsed, s::{eval, S}
+    env,
+    function::{ADD, F, MUL, POW, SUB},
+    number::Number,
+    parser::Parsed,
+    s::{eval, S},
 };
 
 #[derive(Debug, Clone)]
@@ -41,11 +45,12 @@ impl<'a> Polynomial<'a> {
                 // TODO: complex solutions
                 if delta.inner.is_empty() {
                     vec![]
-                }else{
-                vec![
-                    &(-&(b - &delta)) / &(&Number::scalar(2.) * &a),
-                    &(-&(b + &delta)) / &(&Number::scalar(2.) * &a),
-                ]}
+                } else {
+                    vec![
+                        &(-&(b - &delta)) / &(&Number::scalar(2.) * &a),
+                        &(-&(b + &delta)) / &(&Number::scalar(2.) * &a),
+                    ]
+                }
             }
             // TODO: higher order polynomials
             _ => vec![],
@@ -188,7 +193,9 @@ pub fn polynomial<'a>(s: &S<'a>, env: &env::Env) -> Parsed<Polynomial<'a>> {
                 Ok(Polynomial::new(
                     "",
                     match f.f {
-                        F::Nary(f) => f(Number { inner: ss.iter().map(|s| eval(s).inner[0]).collect::<Vec<_>>() }),
+                        F::Nary(f) => f(Number {
+                            inner: ss.iter().map(|s| eval(s).inner[0]).collect::<Vec<_>>(),
+                        }),
                         F::Binary(f) => ss.iter().map(|s| eval(s)).reduce(f).unwrap(),
                     },
                 ))

@@ -1,5 +1,5 @@
 use std::fmt::Display;
-use std::ops::{Add,Sub,Mul,Div,Rem,Neg};
+use std::ops::{Add, Div, Mul, Neg, Rem, Sub};
 
 #[derive(Clone, PartialEq)]
 pub struct Number {
