@@ -28,7 +28,7 @@ impl Num for Number {
         match parts[..] {
             [before, ""] => {
                 if let Ok(whole) = <i64 as Num>::from_str_radix(before, radix) {
-                    return Ok(Number::Rat(Ratio::from_integer(whole)));
+                    return Ok(Number::Flt(whole as f64));
                 }
             }
             ["", after] => {
