@@ -1,4 +1,4 @@
-use crate::{env::Env, token::*};
+use crate::{env::Env, number::Number, token::*};
 
 pub type Parsed<T> = Result<T, String>;
 type Expression<'a> = Vec<Token<'a>>;
@@ -140,7 +140,7 @@ fn number<'a>(text: &'a str, column: &mut usize) -> Parsed<Token<'a>> {
     if lexeme == "-" {
         return Err("minus sign not part of negative number".to_owned());
     }
-    let parsed = lexeme.parse::<f64>();
+    let parsed = lexeme.parse::<Number>();
     match parsed {
         Err(_) => Err(format!("failed to parse '{}'", lexeme)),
         Ok(_) if l == 0 => Err("empty number".to_owned()),
@@ -192,13 +192,13 @@ mod test {
         let input = "2 (+3+5)";
         let actual = stmt(input, &env::Env::prelude()).unwrap();
         let expected = Stmt::Expr(vec![
-            Token::lit(2., "2", 1),
+            Token::lit(Number::Int(2), "2", 1),
             Token::space(2),
             Token::lparen(3),
             Token::sym("+", 4),
-            Token::lit(3., "3", 5),
+            Token::lit(Number::Int(3), "3", 5),
             Token::sym("+", 6),
-            Token::lit(5., "5", 7),
+            Token::lit(Number::Int(5), "5", 7),
             Token::rparen(8),
         ]);
         assert_eq!(expected, actual);
@@ -219,16 +219,16 @@ mod test {
             stmt("x=6", &env::Env::prelude()).unwrap(),
             Stmt::Assignment(
                 vec![Token::new(TokenType::Identifier, "x", 1)],
-                vec![Token::lit(6., "6", 3)]
+                vec![Token::lit(Number::Int(6), "6", 3)]
             )
         );
         assert_eq!(
             stmt("7x+5y", &env::Env::prelude()).unwrap(),
             Stmt::Expr(vec![
-                Token::lit(7., "7", 1),
+                Token::lit(Number::Int(7), "7", 1),
                 Token::new(TokenType::Identifier, "x", 2),
                 Token::new(TokenType::Symbol, "+", 3),
-                Token::lit(5., "5", 4),
+                Token::lit(Number::Int(5), "5", 4),
                 Token::new(TokenType::Identifier, "y", 5),
             ])
         )
@@ -237,17 +237,17 @@ mod test {
     #[test]
     fn _parse() {
         let expected = Ok(Stmt::Expr(vec![
-            Token::lit(234., "234", 1),
+            Token::lit(Number::Int(234), "234", 1),
             Token::sym("*", 4),
-            Token::lit(5., "5", 5),
+            Token::lit(Number::Int(5), "5", 5),
             Token::sym("+", 6),
-            Token::lit(7., "7", 7),
+            Token::lit(Number::Int(7), "7", 7),
             Token::sym("*", 8),
-            Token::lit(8., "8", 9),
+            Token::lit(Number::Int(8), "8", 9),
             Token::sym("-", 10),
-            Token::lit(18., "18", 11),
+            Token::lit(Number::Int(18), "18", 11),
             Token::sym("^", 13),
-            Token::lit(3., "3", 14),
+            Token::lit(Number::Int(3), "3", 14),
         ]));
         assert_eq!(stmt("234*5+7*8-18^3", &env::Env::prelude()), expected);
     }
@@ -258,9 +258,9 @@ mod test {
         let expected = Ok(Stmt::Expr(vec![
             Token::sym("-", 1),
             Token::lparen(2),
-            Token::lit(5., "5", 3),
+            Token::lit(Number::Int(5), "5", 3),
             Token::sym("+", 4),
-            Token::lit(6., "6", 5),
+            Token::lit(Number::Int(6), "6", 5),
             Token::rparen(6),
         ]));
         assert_eq!(stmt(to_parse, &env::Env::prelude()), expected);
@@ -271,10 +271,10 @@ mod test {
         let to_parse = "-1 +4";
         let expected = Ok(Stmt::Expr(vec![
             Token::sym("-", 1),
-            Token::lit(1., "1", 2),
+            Token::lit(Number::Int(1), "1", 2),
             Token::space(3),
             Token::sym("+", 4),
-            Token::lit(4., "4", 5),
+            Token::lit(Number::Int(4), "4", 5),
         ]));
         assert_eq!(stmt(to_parse, &env::Env::prelude()), expected);
     }
@@ -289,14 +289,14 @@ mod test {
                 Token::space(1),
                 Token::sym("-", 2),
                 Token::lparen(3),
-                Token::lit(6., "6", 4),
+                Token::lit(Number::Int(6), "6", 4),
                 Token::rparen(5),
                 Token::space(6),
                 Token::sym("*", 7),
                 Token::space(8),
                 Token::sym("-", 9),
                 Token::lparen(10),
-                Token::lit(6., "6", 11),
+                Token::lit(Number::Int(6), "6", 11),
                 Token::rparen(12),
             ]))
         );

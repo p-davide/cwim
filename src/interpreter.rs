@@ -36,14 +36,15 @@ pub fn run(text: &str, env: &mut Env) -> Parsed<Number> {
             let result = s::eval(&pratt::expr(&mut rhs, env)?)?;
             p -= result;
             // TODO: Allow multiple solutions to be assigned.
-            let zeros = p.zeros();
-            if !zeros.inner.is_empty() {
-                match env.assign(p.unknown.to_owned(), &zeros) {
+            let roots = p.roots();
+            match roots[..] {
+                [root] => match env.assign(p.unknown.to_owned(), &root) {
                     Some(_) => Err("Variable already exists".to_owned()),
-                    None => Ok(zeros),
+                    None => Ok(root),
+                },
+                _ => {
+                    return Err("no solution found".to_owned());
                 }
-            } else {
-                return Err("no solution found".to_owned());
             }
         }
     }

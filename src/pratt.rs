@@ -2,7 +2,6 @@ use crate::env;
 use crate::function::Function;
 use crate::function::MUL;
 
-use crate::number::Number;
 use crate::parser::Parsed;
 use crate::prioritize::Priority;
 use crate::s::S;
@@ -87,7 +86,7 @@ fn expr_bp<'a>(
 ) -> Parsed<S<'a>> {
     let mut lhs = match lexer.pop() {
         Some(t) => match t.ttype {
-            TokenType::Literal(n) => S::Var(Number::scalar(n)),
+            TokenType::Literal(n) => S::Var(n),
             TokenType::Symbol => {
                 if let Some(right) = prefix_op_priority(t.lexeme, env) {
                     let rhs = rhs(lexer, env, right)?;

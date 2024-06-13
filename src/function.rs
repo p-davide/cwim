@@ -1,5 +1,7 @@
 use std::ops::Neg;
 
+use num::pow::Pow;
+
 use crate::number::Number;
 
 #[derive(Clone, Copy)]
@@ -49,35 +51,30 @@ impl<'f> std::fmt::Debug for Function<'f> {
     }
 }
 
-pub const SQRT: Function = Function::unary("sqrt", 2, |xs| xs.vectorized(|x| x.sqrt()));
-pub const CBRT: Function = Function::unary("cbrt", 2, |xs| xs.vectorized(|x| x.cbrt()));
-pub const COS: Function = Function::unary("cos", 2, |xs| xs.vectorized(|x| x.cos()));
-pub const SIN: Function = Function::unary("sin", 2, |xs| xs.vectorized(|x| x.sin()));
-pub const TAN: Function = Function::unary("tan", 2, |xs| xs.vectorized(|x| x.tan()));
-pub const COSH: Function = Function::unary("cosh", 2, |xs| xs.vectorized(|x| x.cosh()));
-pub const SINH: Function = Function::unary("sinh", 2, |xs| xs.vectorized(|x| x.sinh()));
-pub const TANH: Function = Function::unary("tanh", 2, |xs| xs.vectorized(|x| x.tanh()));
-pub const ACOS: Function = Function::unary("acos", 2, |xs| xs.vectorized(|x| x.acos()));
-pub const ASIN: Function = Function::unary("asin", 2, |xs| xs.vectorized(|x| x.asin()));
-pub const ATAN: Function = Function::unary("atan", 2, |xs| xs.vectorized(|x| x.atan()));
-pub const ACOSH: Function = Function::unary("acosh", 2, |xs| xs.vectorized(|x| x.acosh()));
-pub const ASINH: Function = Function::unary("asinh", 2, |xs| xs.vectorized(|x| x.asinh()));
-pub const ATANH: Function = Function::unary("atanh", 2, |xs| xs.vectorized(|x| x.atanh()));
-pub const EXP: Function = Function::unary("exp", 2, |xs| xs.vectorized(|x| x.exp()));
-pub const LN: Function = Function::unary("ln", 2, |xs| xs.vectorized(|x| x.ln()));
-pub const LOG: Function = Function::unary("log", 2, |xs| xs.vectorized(|x| x.log10()));
-pub const NEG: Function = Function::unary("-", 6, |xs| xs.vectorized(|x| x.neg()));
-pub const ID: Function = Function::unary("+", 6, |xs| xs);
-pub const ADD: Function = Function::binary("+", 4, |xs, ys| &ys + &xs);
-pub const SUB: Function = Function::binary("-", 4, |xs, ys| &ys - &xs);
-pub const MUL: Function = Function::binary("*", 6, |xs, ys| &ys * &xs);
-pub const DIV: Function = Function::binary("/", 6, |xs, ys| &ys / &xs);
+pub const SQRT: Function = Function::unary("sqrt", 2, |x| x.wrapped(|x| x.sqrt()));
+pub const CBRT: Function = Function::unary("cbrt", 2, |x| x.wrapped(|x| x.cbrt()));
+pub const COS: Function = Function::unary("cos", 2, |x| x.wrapped(|x| x.cos()));
+pub const SIN: Function = Function::unary("sin", 2, |x| x.wrapped(|x| x.sin()));
+pub const TAN: Function = Function::unary("tan", 2, |x| x.wrapped(|x| x.tan()));
+pub const COSH: Function = Function::unary("cosh", 2, |x| x.wrapped(|x| x.cosh()));
+pub const SINH: Function = Function::unary("sinh", 2, |x| x.wrapped(|x| x.sinh()));
+pub const TANH: Function = Function::unary("tanh", 2, |x| x.wrapped(|x| x.tanh()));
+pub const ACOS: Function = Function::unary("acos", 2, |x| x.wrapped(|x| x.acos()));
+pub const ASIN: Function = Function::unary("asin", 2, |x| x.wrapped(|x| x.asin()));
+pub const ATAN: Function = Function::unary("atan", 2, |x| x.wrapped(|x| x.atan()));
+pub const ACOSH: Function = Function::unary("acosh", 2, |x| x.wrapped(|x| x.acosh()));
+pub const ASINH: Function = Function::unary("asinh", 2, |x| x.wrapped(|x| x.asinh()));
+pub const ATANH: Function = Function::unary("atanh", 2, |x| x.wrapped(|x| x.atanh()));
+pub const EXP: Function = Function::unary("exp", 2, |x| x.wrapped(|x| x.exp()));
+pub const LN: Function = Function::unary("ln", 2, |x| x.wrapped(|x| x.ln()));
+pub const LOG: Function = Function::unary("log", 2, |x| x.wrapped(|x| x.log10()));
+pub const NEG: Function = Function::unary("-", 6, |x| x.neg());
+pub const ID: Function = Function::unary("+", 6, |x| x);
+pub const ADD: Function = Function::binary("+", 4, |x, y| y + x);
+pub const SUB: Function = Function::binary("-", 4, |x, y| y - x);
+pub const MUL: Function = Function::binary("*", 6, |x, y| y * x);
+pub const DIV: Function = Function::binary("/", 6, |x, y| y / x);
 // https://en.wikipedia.org/wiki/Modulo#Variants_of_the_definition
 // Truncated
-pub const REM: Function = Function::binary("%", 6, |xs, ys| &ys % &xs);
-pub const POW: Function = Function::binary("^", 7, |xs, ys| match &xs.inner[..] {
-    &[x] => Number {
-        inner: ys.inner.iter().map(|y| y.powf(x)).collect(),
-    },
-    bad => panic!("non scalar exponent: {:?}", bad),
-});
+pub const REM: Function = Function::binary("%", 6, |x, y| y % x);
+pub const POW: Function = Function::binary("^", 7, |x, y| y.pow(x));

@@ -4,6 +4,8 @@ use std::{
     ops::*,
 };
 
+use num::{One, Zero};
+
 use crate::{
     env,
     function::{ADD, MUL, POW, SUB},
@@ -35,28 +37,27 @@ impl<'a> Polynomial<'a> {
             panic!("two different unknowns: {}, {}", self.unknown, name)
         };
     }
-    pub fn zeros(&self) -> Number {
+    pub fn roots(&self) -> Vec<Number> {
         let inner = match &self.coefs[..] {
-            [] => panic!("empty polynomial"),
+            [] => vec![],
             [_] => vec![],
-            [b, a] => vec![-&(b / a)],
+            [b, a] => vec![-(*b / *a)],
             [c, b, a] => {
-                let delta = (&(b * b) - &(&(a * c) * &Number::scalar(4.))).vectorized(|x| x.sqrt());
+                let delta = ((*b * *b) - ((*a * *c) * Number::Int(4))).wrapped(|x| x.sqrt());
                 // TODO: complex solutions
-                if delta.inner.is_empty() {
-                    vec![]
-                } else {
-                    vec![
-                        &(-&(b - &delta)) / &(&Number::scalar(2.) * &a),
-                        &(-&(b + &delta)) / &(&Number::scalar(2.) * &a),
-                    ]
+                match delta {
+                    delta @ Number::Flt(d) if !d.is_nan() => vec![
+                        (-(*b - delta)) / (Number::Int(2) * *a),
+                        (-(*b + delta)) / (Number::Int(2) * *a),
+                    ],
+                    _ => vec![],
                 }
             }
             // TODO: higher order polynomials
             _ => vec![],
         };
         // TODO: multiple solutions
-        inner[0].clone()
+        inner
     }
 }
 
@@ -70,9 +71,9 @@ impl<'a> Add<Self> for &Polynomial<'a> {
         };
         let coefs = zip(
             longest.iter(),
-            shortest.iter().chain(repeat(&Number::scalar(0.))),
+            shortest.iter().chain(repeat(&Number::zero())),
         )
-        .map(|(x, y)| x + y)
+        .map(|(x, y)| *x + *y)
         .collect();
         let mut result = Polynomial { coefs, ..*self };
         result.set_unknown(other.unknown);
@@ -98,9 +99,9 @@ impl<'a> Sub<Self> for &Polynomial<'a> {
         };
         let coefs = zip(
             longest.iter(),
-            shortest.iter().chain(repeat(&Number::scalar(0.))),
+            shortest.iter().chain(repeat(&Number::zero())),
         )
-        .map(|(x, y)| x - y)
+        .map(|(x, y)| *x - *y)
         .collect();
         let mut result = Polynomial { coefs, ..*self };
         result.set_unknown(other.unknown);
@@ -119,10 +120,10 @@ impl<'a> SubAssign<&Self> for Polynomial<'a> {
 impl<'a> Mul<Self> for &Polynomial<'a> {
     type Output = Polynomial<'a>;
     fn mul(self, other: Self) -> Self::Output {
-        let mut result = vec![Number::scalar(0.); self.coefs.len() + other.coefs.len() - 1];
+        let mut result = vec![Number::zero(); self.coefs.len() + other.coefs.len() - 1];
         for (d1, c1) in self.coefs.iter().enumerate() {
             for (d2, c2) in other.coefs.iter().enumerate() {
-                result[d1 + d2] = &(c1 * c2) + &result[d1 + d2];
+                result[d1 + d2] = *c1 * *c2 + result[d1 + d2];
             }
         }
         let mut result = Polynomial {
@@ -153,13 +154,13 @@ impl<'a> Add<Number> for Polynomial<'a> {
 
 impl<'a> AddAssign<Number> for Polynomial<'a> {
     fn add_assign(&mut self, other: Number) {
-        self.coefs[0] = &self.coefs[0] + &other;
+        self.coefs[0] = self.coefs[0] + other;
     }
 }
 
 impl<'a> SubAssign<Number> for Polynomial<'a> {
     fn sub_assign(&mut self, other: Number) {
-        self.coefs[0] = &self.coefs[0] - &other;
+        self.coefs[0] = self.coefs[0] - other;
     }
 }
 
@@ -168,7 +169,7 @@ impl<'a> Neg for Polynomial<'a> {
 
     fn neg(self) -> Self::Output {
         Self::Output {
-            coefs: self.coefs.iter().map(|x| -x).collect(),
+            coefs: self.coefs.iter().map(|x| x.neg()).collect(),
             ..self
         }
     }
@@ -179,29 +180,28 @@ pub fn polynomial<'a>(s: &S<'a>, env: &env::Env) -> Parsed<Polynomial<'a>> {
         S::Var(n) => Ok(Polynomial::new("", n.clone())),
         S::Fun(fun, ss) => {
             if fun == &ADD {
-                let mut result = Polynomial::new("", Number::scalar(0.));
+                let mut result = Polynomial::new("", Number::zero());
                 for s in ss {
                     result += &polynomial(s, env)?;
                 }
                 Ok(result)
             } else if fun == &SUB {
-                let mut result = Polynomial::new("", Number::scalar(0.));
+                let mut result = Polynomial::new("", Number::zero());
                 for s in ss {
                     result -= &polynomial(s, env)?;
                 }
                 Ok(result)
             } else if fun == &MUL {
-                let mut result = Polynomial::new("", Number::scalar(1.));
+                let mut result = Polynomial::new("", Number::one());
                 for s in ss {
                     result *= &polynomial(s, env)?;
                 }
                 Ok(result)
             } else if fun == &POW {
                 // TODO: Matrix exponents
-                let mut fexp = 0f64;
+                let fexp = 0f64;
                 for s in ss.iter().skip(1) {
-                    match &eval(s)?.inner[..] {
-                        &[n] => fexp += n,
+                    match &eval(s)? {
                         bad => return Err(format!("Exponent should have size 1, found {:?}", bad)),
                     }
                 }
@@ -211,7 +211,7 @@ pub fn polynomial<'a>(s: &S<'a>, env: &env::Env) -> Parsed<Polynomial<'a>> {
                     return Err("Fractional exponent are not supported".to_owned());
                 };
                 let base = polynomial(&ss[0], env)?;
-                let mut result = Polynomial::new("", Number::scalar(1.));
+                let mut result = Polynomial::new("", Number::one());
                 for _ in 0..exp {
                     result *= &base;
                 }
@@ -222,7 +222,7 @@ pub fn polynomial<'a>(s: &S<'a>, env: &env::Env) -> Parsed<Polynomial<'a>> {
         }
         S::Unknown(name) => Ok(Polynomial {
             unknown: *name,
-            coefs: vec![Number::scalar(0.), Number::scalar(1.)],
+            coefs: vec![Number::zero(), Number::one()],
         }),
     }
 }

@@ -33,17 +33,11 @@ pub fn eval(s: &S) -> Parsed<Number> {
     match s {
         S::Var(n) => Ok(n.clone()),
         S::Fun(fun, ss) => match fun.f {
-            F::Nary(f) => {
-                let mut result = vec![];
-                for s in ss {
-                    result.push(eval(s)?.inner[0]);
-                }
-                Ok(f(Number { inner: result }))
-            }
+            F::Nary(f) => Ok(f(eval(&ss[0])?)),
             F::Binary(f) => {
                 let mut result = None;
                 for s in ss {
-                    let next = Number::scalar(eval(s)?.inner[0]);
+                    let next = eval(s)?;
                     result = match result {
                         None => Some(next),
                         Some(curr) => Some(f(next, curr)),
@@ -78,12 +72,12 @@ mod test {
         let expected = S::Fun(
             MUL,
             vec![
-                S::Var(Number::scalar(2.)),
+                S::Var(Number::Int(2)),
                 S::Fun(
                     ADD,
                     vec![
-                        S::Fun(ID, vec![S::Var(Number::scalar(3.))]),
-                        S::Var(Number::scalar(5.)),
+                        S::Fun(ID, vec![S::Var(Number::Int(3))]),
+                        S::Var(Number::Int(5)),
                     ],
                 ),
             ],

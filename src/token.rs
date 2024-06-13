@@ -1,6 +1,8 @@
+use crate::number::Number;
+
 #[derive(PartialEq, Debug, Copy, Clone)]
 pub enum TokenType {
-    Literal(f64),
+    Literal(Number),
     Identifier,
     Symbol,
     Space,
@@ -31,7 +33,7 @@ impl<'t> Token<'t> {
         }
     }
 
-    pub fn lit(lit: f64, lexeme: &'t str, column: usize) -> Self {
+    pub fn lit(lit: Number, lexeme: &'t str, column: usize) -> Self {
         Self::new(TokenType::Literal(lit), lexeme, column)
     }
 
