@@ -38,10 +38,15 @@ pub fn run(text: &str, env: &mut Env) -> Parsed<Number> {
             // TODO: Allow multiple solutions to be assigned.
             let roots = p.roots();
             match roots[..] {
-                [root] => match env.assign(p.unknown.to_owned(), &root) {
-                    Some(_) => Err("Variable already exists".to_owned()),
-                    None => Ok(root),
-                },
+                [root] => {
+                    env.assign(p.unknown.to_owned(), &root);
+                    Ok(root)
+                }
+                [root1, root2] => {
+                    println!("{}, {}", root1, root2);
+                    env.assign(p.unknown.to_owned(), &root1);
+                    Ok(root1)
+                }
                 _ => {
                     return Err("no solution found".to_owned());
                 }
