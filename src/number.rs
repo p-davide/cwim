@@ -1,4 +1,4 @@
-use std::{f64::NAN, fmt::Display, ops::*, str::FromStr};
+use std::{f64::NAN, fmt::Display, ops::*};
 
 use num::{
     pow::Pow,
@@ -225,15 +225,6 @@ impl Zero for Number {
             Number::Rat(n) => *n != 0.into(),
             Number::Flt(n) => *n != 0.into(),
         }
-    }
-}
-
-impl FromStr for Number {
-    type Err = ParseFloatError;
-
-    fn from_str(s: &str) -> Result<Self, Self::Err> {
-        // TODO: support for other radices (hex at the very least)
-        Self::from_str_radix(s, 10)
     }
 }
 

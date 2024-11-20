@@ -1,3 +1,5 @@
+use num::Num;
+
 use crate::{env::Env, number::Number, token::*};
 
 pub type Parsed<T> = Result<T, String>;
@@ -129,24 +131,43 @@ fn comment<'a>(text: &'a str, column: &mut usize) -> Parsed<Token<'a>> {
 
 fn number<'a>(text: &'a str, column: &mut usize) -> Parsed<Token<'a>> {
     let mut l: usize = 0;
-    for c in text.chars() {
-        if c.is_ascii_digit() || c == '.' || (l == 0 && c == '-') {
+    let mut h: usize = 0;
+    let mut radix = 10;
+    if &text[1..1] == "-" {
+        h += 1;
+    }
+    if text[h..].len() > 2 && &text[h..h + 2] == "0x" {
+        h += 2;
+        radix = 16;
+    }
+    if text[h..].len() > 2 && &text[h..h + 2] == "0o" {
+        h += 2;
+        radix = 8;
+    }
+    if text[h..].len() > 2 && &text[h..h + 2] == "0b" {
+        h += 2;
+        radix = 2;
+    }
+    for c in text.chars().skip(h) {
+        if ((radix <= 10 && c.is_ascii_digit()) || (radix == 16 && c.is_ascii_hexdigit()))
+            || c == '.'
+        {
             l += 1;
         } else {
             break;
         }
     }
-    let lexeme = &text[..l];
+    let lexeme = &text[..h + l];
     if lexeme == "-" {
         return Err("minus sign not part of negative number".to_owned());
     }
-    let parsed = lexeme.parse::<Number>();
+    let parsed = Number::from_str_radix(&lexeme[h..], radix);
     match parsed {
-        Err(_) => Err(format!("failed to parse '{}'", lexeme)),
+        Err(_) => Err(format!("failed to parse '{}' in base {}", lexeme, radix)),
         Ok(_) if l == 0 => Err("empty number".to_owned()),
         Ok(n) => {
-            *column += l;
-            Ok(Token::lit(n, lexeme, *column - l))
+            *column += l + h;
+            Ok(Token::lit(n, lexeme, *column - l - h))
         }
     }
 }
@@ -187,30 +208,38 @@ mod test {
 
     use super::*;
 
-    #[test]
-    fn _z() {
-        let input = "2 (+3+5)";
+    fn test_expr(input: &str, expected_tokens: Vec<Token>) {
         let actual = stmt(input, &env::Env::prelude()).unwrap();
-        let expected = Stmt::Expr(vec![
-            Token::lit(Number::Int(2), "2", 1),
-            Token::space(2),
-            Token::lparen(3),
-            Token::sym("+", 4),
-            Token::lit(Number::Int(3), "3", 5),
-            Token::sym("+", 6),
-            Token::lit(Number::Int(5), "5", 7),
-            Token::rparen(8),
-        ]);
+        let expected = Stmt::Expr(expected_tokens);
         assert_eq!(expected, actual);
     }
 
     #[test]
+    fn _0x() {
+        test_expr("0xaC", vec![Token::lit(Number::Int(0xac), "0xaC", 1)]);
+        test_expr("0x.", vec![Token::lit(Number::Flt(0.), "0x.", 1)]);
+    }
+
+    #[test]
+    fn _z() {
+        test_expr(
+            "2 (+3+5)",
+            vec![
+                Token::lit(Number::Int(2), "2", 1),
+                Token::space(2),
+                Token::lparen(3),
+                Token::sym("+", 4),
+                Token::lit(Number::Int(3), "3", 5),
+                Token::sym("+", 6),
+                Token::lit(Number::Int(5), "5", 7),
+                Token::rparen(8),
+            ],
+        )
+    }
+
+    #[test]
     fn _spaces() {
-        let spaces = "       ";
-        assert_eq!(
-            stmt(spaces, &env::Env::prelude()).unwrap(),
-            Stmt::Expr(vec![Token::new(TokenType::Space, spaces, 1)])
-        );
+        test_expr("       ", vec![Token::new(TokenType::Space, "       ", 1)])
     }
 
     #[test]
@@ -222,15 +251,15 @@ mod test {
                 vec![Token::lit(Number::Int(6), "6", 3)]
             )
         );
-        assert_eq!(
-            stmt("7x+5y", &env::Env::prelude()).unwrap(),
-            Stmt::Expr(vec![
+        test_expr(
+            "7x+5y",
+            vec![
                 Token::lit(Number::Int(7), "7", 1),
                 Token::new(TokenType::Identifier, "x", 2),
                 Token::new(TokenType::Symbol, "+", 3),
                 Token::lit(Number::Int(5), "5", 4),
                 Token::new(TokenType::Identifier, "y", 5),
-            ])
+            ],
         )
     }
 
@@ -279,7 +308,6 @@ mod test {
         assert_eq!(stmt(to_parse, &env::Env::prelude()), expected);
     }
 
-    //" -(6) * -(6)"
     #[test]
     fn _d() {
         let to_parse = " -(6) * -(6)";
