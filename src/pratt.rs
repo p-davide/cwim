@@ -106,16 +106,33 @@ fn expr_bp<'a>(
                 );
                 lhs
             }
-            // TODO: This assumes every name is of a unary prefix function.
+            // TODO: This assumes every function name is of a unary prefix function.
             //       Functions with more args should be supported.
             TokenType::Identifier => match env.get(t.lexeme) {
-                Some(env::Variable::Function(fs)) => {
-                    let rhs = match fs.unary.map(|it| it.priority * 2 + 1) {
-                        Some(right) => rhs(lexer, env, right)?,
-                        None => return Err("expected function".to_owned()),
-                    };
-                    S::Fun(get_prefix_by_name(t.lexeme, env), vec![rhs])
-                }
+                Some(env::Variable::Function(fs)) => match lexer.last().map(|it| it.ttype) {
+                    None => {
+                        return Err(format!(
+                            "function {} was called with 0 arguments, expected 1",
+                            t.lexeme
+                        ))
+                    }
+                    // Special case function application using parens for cases
+                    // such as cos(0)-1, otherwise interpreted as cos((0)-1)
+                    Some(TokenType::LParen) => {
+                        let rhs = match fs.unary.map(|it| it.priority * 2 + 1) {
+                            Some(_) => rhs(lexer, env, 0xff)?,
+                            None => return Err("expected function".to_owned()),
+                        };
+                        S::Fun(get_prefix_by_name(t.lexeme, env), vec![rhs])
+                    }
+                    Some(_) => {
+                        let rhs = match fs.unary.map(|it| it.priority * 2 + 1) {
+                            Some(right) => rhs(lexer, env, right)?,
+                            None => return Err("expected function".to_owned()),
+                        };
+                        S::Fun(get_prefix_by_name(t.lexeme, env), vec![rhs])
+                    }
+                },
                 Some(env::Variable::Value(n)) => S::Var(n.clone()),
                 _ => S::Unknown(t.lexeme),
             },
@@ -302,5 +319,10 @@ mod test {
     #[test]
     fn _implied_multiplication_0() {
         tokenize_and_parse("2pi", "(* 2 3.141592653589793)")
+    }
+
+    #[test]
+    fn _implied_multiplication_and_fn_apply() {
+        tokenize_and_parse("cos(1)-2", "(- (cos 1) 2)");
     }
 }
