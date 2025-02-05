@@ -1,12 +1,13 @@
 use cwim::env::*;
 use cwim::interpreter::run;
 use cwim::number::Number;
+use num::BigInt;
 fn _test_run(text: &str, expected: Number) {
     assert_eq!(run(text, &mut Env::prelude()), Ok(expected));
 }
 
 fn _test_run_int(text: &str, expected: i64) {
-    _test_run(text, Number::Int(expected))
+    _test_run(text, Number::from(expected))
 }
 
 fn _test_run_float(text: &str, expected: f64) {
@@ -20,10 +21,7 @@ fn _run_basic() {
 
 #[test]
 fn _run_with_spaces_1() {
-    _test_run_int(
-        "234 * 5+7*8-18 ^ 3",
-        234 * (5 + 7 * 8  - 18i64).pow(3),
-    );
+    _test_run_int("234 * 5+7*8-18 ^ 3", 234 * (5 + 7 * 8 - 18i64).pow(3));
 }
 
 #[test]
@@ -40,10 +38,7 @@ fn _plus_minus() {
 
 #[test]
 fn _run_with_spaces_2() {
-    _test_run_int(
-        "234*5+7*8-18 ^ 3",
-        (234 * 5 + 7 * 8 as i64 - 18).pow(3),
-    );
+    _test_run_int("234*5+7*8-18 ^ 3", (234 * 5 + 7 * 8 as i64 - 18).pow(3));
 }
 
 #[test]
@@ -56,10 +51,7 @@ fn _a() {
     _test_run_int("6+1*9", 6 + 1 * 9);
     _test_run_int("6 + 1 * 9", 6 + 1 * 9);
     _test_run_int("5 + 6 + 1 * 9", 5 + 6 + 1 * 9);
-    _test_run_int(
-        "2 ^ 4 * 5 + 6 + 1 ^ 9",
-        2i64.pow(4) * 5 + 6 + 1i64.pow(9),
-    )
+    _test_run_int("2 ^ 4 * 5 + 6 + 1 ^ 9", 2i64.pow(4) * 5 + 6 + 1i64.pow(9))
 }
 
 #[test]
@@ -74,10 +66,7 @@ fn _run_with_spaces_3() {
 
 #[test]
 fn _run_with_spaces_4() {
-    _test_run_int(
-        "234 * 5+7*8-18 ^ 3",
-        234 * (5 + 7 * 8 - 18 as i64).pow(3),
-    );
+    _test_run_int("234 * 5+7*8-18 ^ 3", 234 * (5 + 7 * 8 - 18 as i64).pow(3));
 }
 
 #[test]
@@ -99,10 +88,7 @@ fn _implied_multiplication_3() {
 
 #[test]
 fn _run_with_parens_3() {
-    _test_run_int(
-        "234 *(5+7*8-18) ^ 3",
-        234 * (5 + 7 * 8 - 18 as i64).pow(3),
-    );
+    _test_run_int("234 *(5+7*8-18) ^ 3", 234 * (5 + 7 * 8 - 18 as i64).pow(3));
 }
 
 #[test]
@@ -117,12 +103,12 @@ fn _just_a_number() {
 
 #[test]
 fn _unmatched_parens() {
-    assert_eq!(run("4)", &mut Env::prelude()), Ok(Number::Int(4)));
+    assert_eq!(run("4)", &mut Env::prelude()), Ok(Number::from(4)));
 }
 
 #[test]
 fn _negation() {
-    assert_eq!(run("-4", &mut Env::prelude()), Ok(Number::Int(-4)));
+    assert_eq!(run("-4", &mut Env::prelude()), Ok(Number::from(-4)));
 }
 
 #[test]
@@ -151,7 +137,7 @@ fn _1st_deg_poly() {
     let _ = run("7x = 14", &mut env);
     assert_eq!(
         env.find_value("x"),
-        Ok(cwim::interpreter::Expr::Literal(Number::Int(2)))
+        Ok(cwim::interpreter::Expr::Literal(Number::from(2)))
     );
 }
 
@@ -162,12 +148,12 @@ fn _assignment() {
     let _ = run("x = 6", &mut env);
     assert_eq!(
         env.find_value("x"),
-        Ok(cwim::interpreter::Expr::Literal(Number::Int(6)))
+        Ok(cwim::interpreter::Expr::Literal(Number::from(6)))
     );
     let _ = run("7z+5z = 12", &mut env);
     assert_eq!(
         env.find_value("z"),
-        Ok(cwim::interpreter::Expr::Literal(Number::Int(1)))
+        Ok(cwim::interpreter::Expr::Literal(Number::from(1)))
     );
 }
 
@@ -179,4 +165,30 @@ fn _assignment2() {
         env.find_value("y"),
         Ok(cwim::interpreter::Expr::Literal(Number::Flt(1.)))
     );
+}
+
+#[test]
+fn _bignum() {
+    assert_eq!(
+        run("2^128", &mut Env::prelude()),
+        Ok(Number::Int(
+            BigInt::parse_bytes(b"340282366920938463463374607431768211456", 10).unwrap()
+        ))
+    );
+    assert_eq!(
+        run(
+            "0xffffffffffffffffffffffffffffffffffffffffff",
+            &mut Env::prelude()
+        ),
+        Ok(Number::Int(
+            BigInt::parse_bytes(b"374144419156711147060143317175368453031918731001855", 10)
+                .unwrap()
+        ))
+    );
+}
+
+#[test]
+fn _divide_by_zero() {
+    assert!(run("-1/0", &mut Env::prelude()).is_ok_and(|it|it.is_nan()));
+    assert!(run("-1/-0", &mut Env::prelude()).is_ok_and(|it|it.is_nan()));
 }

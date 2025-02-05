@@ -26,21 +26,18 @@ fn pop_if_space<'a>(lexer: &mut Vec<Token<'a>>) -> Option<Token<'a>> {
 
 fn pop_spaced_infix(lexer: &mut Vec<Token>) {
     pop_if_space(lexer);
-    match lexer.last().map(|it| it.ttype) {
-        Some(TokenType::Symbol) => {
-            lexer.pop();
-            pop_if_space(lexer);
-        }
-        _ => {}
+    if let Some(TokenType::Symbol) = lexer.last().map(|it| it.ttype.clone()) {
+        lexer.pop();
+        pop_if_space(lexer);
     }
 }
 
 fn spaced_infix<'a>(lexer: &mut Vec<Token<'a>>) -> (u16, Option<Token<'a>>) {
     let pre_space = pop_if_space(lexer);
-    let pre_spaces = pre_space.map_or(0, |it| it.lexeme.len() as u16);
+    let pre_spaces = pre_space.clone().map_or(0, |it| it.lexeme.len() as u16);
     let maybe_token = lexer.pop();
     let post_space = pop_if_space(lexer);
-    let mut post_spaces = post_space.map_or(0, |it| it.lexeme.len() as u16);
+    let mut post_spaces = post_space.clone().map_or(0, |it| it.lexeme.len() as u16);
     // Ignore ending spaces
     if lexer.is_empty() {
         post_spaces = 0;
@@ -48,8 +45,8 @@ fn spaced_infix<'a>(lexer: &mut Vec<Token<'a>>) -> (u16, Option<Token<'a>>) {
     if let Some(t) = post_space {
         lexer.push(t);
     }
-    if let Some(t) = maybe_token {
-        lexer.push(t);
+    if let Some(ref t) = maybe_token {
+        lexer.push(t.clone());
     }
     if let Some(t) = pre_space {
         lexer.push(t);
@@ -59,12 +56,12 @@ fn spaced_infix<'a>(lexer: &mut Vec<Token<'a>>) -> (u16, Option<Token<'a>>) {
 
 fn get_infix_by_name<'f>(name: &str, env: &'f env::Env) -> Function<'f> {
     env.find_binary(name)
-        .expect(&format!("Binary {} not found", name))
+        .unwrap_or_else(|_| panic!("Binary {} not found", name))
 }
 
 fn get_prefix_by_name<'f>(name: &str, env: &'f env::Env) -> Function<'f> {
     env.find_unary(name)
-        .expect(&format!("Unary {} not found", name))
+        .unwrap_or_else(|_| panic!("Unary {} not found", name))
 }
 
 fn rhs<'a>(lexer: &mut Vec<Token<'a>>, env: &'a env::Env, right: u16) -> Parsed<S<'a>> {
@@ -95,6 +92,7 @@ fn expr_bp<'a>(
                     return Err(format!("unknown prefix operator {}", t.lexeme));
                 }
             }
+
             TokenType::LParen => {
                 pop_if_space(lexer);
                 let lhs = expr_bp(lexer, env, Priority::MIN)?;
@@ -109,30 +107,32 @@ fn expr_bp<'a>(
             // TODO: This assumes every function name is of a unary prefix function.
             //       Functions with more args should be supported.
             TokenType::Identifier => match env.get(t.lexeme) {
-                Some(env::Variable::Function(fs)) => match lexer.last().map(|it| it.ttype) {
-                    None => {
-                        return Err(format!(
-                            "function {} was called with 0 arguments, expected 1",
-                            t.lexeme
-                        ))
+                Some(env::Variable::Function(fs)) => {
+                    match lexer.last().map(|it| it.ttype.clone()) {
+                        None => {
+                            return Err(format!(
+                                "function {} was called with 0 arguments, expected 1",
+                                t.lexeme
+                            ))
+                        }
+                        // Special case function application using parens for cases
+                        // such as cos(0)-1, otherwise interpreted as cos((0)-1)
+                        Some(TokenType::LParen) => {
+                            let rhs = match fs.unary.map(|it| it.priority * 2 + 1) {
+                                Some(_) => rhs(lexer, env, 0xff)?,
+                                None => return Err("expected function".to_owned()),
+                            };
+                            S::Fun(get_prefix_by_name(t.lexeme, env), vec![rhs])
+                        }
+                        Some(_) => {
+                            let rhs = match fs.unary.map(|it| it.priority * 2 + 1) {
+                                Some(right) => rhs(lexer, env, right)?,
+                                None => return Err("expected function".to_owned()),
+                            };
+                            S::Fun(get_prefix_by_name(t.lexeme, env), vec![rhs])
+                        }
                     }
-                    // Special case function application using parens for cases
-                    // such as cos(0)-1, otherwise interpreted as cos((0)-1)
-                    Some(TokenType::LParen) => {
-                        let rhs = match fs.unary.map(|it| it.priority * 2 + 1) {
-                            Some(_) => rhs(lexer, env, 0xff)?,
-                            None => return Err("expected function".to_owned()),
-                        };
-                        S::Fun(get_prefix_by_name(t.lexeme, env), vec![rhs])
-                    }
-                    Some(_) => {
-                        let rhs = match fs.unary.map(|it| it.priority * 2 + 1) {
-                            Some(right) => rhs(lexer, env, right)?,
-                            None => return Err("expected function".to_owned()),
-                        };
-                        S::Fun(get_prefix_by_name(t.lexeme, env), vec![rhs])
-                    }
-                },
+                }
                 Some(env::Variable::Value(n)) => S::Var(n.clone()),
                 _ => S::Unknown(t.lexeme),
             },

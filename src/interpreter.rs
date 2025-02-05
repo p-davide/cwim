@@ -31,25 +31,23 @@ pub fn run(text: &str, env: &mut Env) -> Parsed<Number> {
         Stmt::Expr(mut tks) => Ok(s::eval(&pratt::expr(&mut tks, env)?)?),
         Stmt::Assignment(mut lhs, mut rhs) => {
             let expr = pratt::expr(&mut lhs, env)?;
-            let mut p = polynomial(&expr, env)?;
+            let mut p = polynomial(&expr)?;
             // example: in x^2 + 2x = 6+5, result = 11
             let result = s::eval(&pratt::expr(&mut rhs, env)?)?;
             p -= result;
             // TODO: Allow multiple solutions to be assigned.
             let roots = p.roots();
-            match roots[..] {
+            match &roots[..] {
                 [root] => {
                     env.assign(p.unknown.to_owned(), &root);
-                    Ok(root)
+                    Ok(root.clone())
                 }
                 [root1, root2] => {
                     println!("{}, {}", root1, root2);
                     env.assign(p.unknown.to_owned(), &root1);
-                    Ok(root1)
+                    Ok(root1.clone())
                 }
-                _ => {
-                    return Err("no solution found".to_owned());
-                }
+                _ => Err("no solution found".to_owned()),
             }
         }
     }

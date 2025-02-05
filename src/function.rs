@@ -51,23 +51,23 @@ impl<'f> std::fmt::Debug for Function<'f> {
     }
 }
 
-pub const SQRT: Function = Function::unary("sqrt", 2, |x| x.wrapped(|x| x.sqrt()));
-pub const CBRT: Function = Function::unary("cbrt", 2, |x| x.wrapped(|x| x.cbrt()));
-pub const COS: Function = Function::unary("cos", 2, |x| x.wrapped(|x| x.cos()));
-pub const SIN: Function = Function::unary("sin", 2, |x| x.wrapped(|x| x.sin()));
-pub const TAN: Function = Function::unary("tan", 2, |x| x.wrapped(|x| x.tan()));
-pub const COSH: Function = Function::unary("cosh", 2, |x| x.wrapped(|x| x.cosh()));
-pub const SINH: Function = Function::unary("sinh", 2, |x| x.wrapped(|x| x.sinh()));
-pub const TANH: Function = Function::unary("tanh", 2, |x| x.wrapped(|x| x.tanh()));
-pub const ACOS: Function = Function::unary("acos", 2, |x| x.wrapped(|x| x.acos()));
-pub const ASIN: Function = Function::unary("asin", 2, |x| x.wrapped(|x| x.asin()));
-pub const ATAN: Function = Function::unary("atan", 2, |x| x.wrapped(|x| x.atan()));
-pub const ACOSH: Function = Function::unary("acosh", 2, |x| x.wrapped(|x| x.acosh()));
-pub const ASINH: Function = Function::unary("asinh", 2, |x| x.wrapped(|x| x.asinh()));
-pub const ATANH: Function = Function::unary("atanh", 2, |x| x.wrapped(|x| x.atanh()));
-pub const EXP: Function = Function::unary("exp", 2, |x| x.wrapped(|x| x.exp()));
-pub const LN: Function = Function::unary("ln", 2, |x| x.wrapped(|x| x.ln()));
-pub const LOG: Function = Function::unary("log", 2, |x| x.wrapped(|x| x.log10()));
+pub const SQRT: Function = Function::unary("sqrt", 2, |x| Number::Flt(x.f64_or_nan().sqrt()));
+pub const CBRT: Function = Function::unary("cbrt", 2, |x| Number::Flt(x.f64_or_nan().cbrt()));
+pub const COS: Function = Function::unary("cos", 2, |x| Number::Flt(x.f64_or_nan().cos()));
+pub const SIN: Function = Function::unary("sin", 2, |x| Number::Flt(x.f64_or_nan().sin()));
+pub const TAN: Function = Function::unary("tan", 2, |x| Number::Flt(x.f64_or_nan().tan()));
+pub const COSH: Function = Function::unary("cosh", 2, |x| Number::Flt(x.f64_or_nan().cosh()));
+pub const SINH: Function = Function::unary("sinh", 2, |x| Number::Flt(x.f64_or_nan().sinh()));
+pub const TANH: Function = Function::unary("tanh", 2, |x| Number::Flt(x.f64_or_nan().tanh()));
+pub const ACOS: Function = Function::unary("acos", 2, |x| Number::Flt(x.f64_or_nan().acos()));
+pub const ASIN: Function = Function::unary("asin", 2, |x| Number::Flt(x.f64_or_nan().asin()));
+pub const ATAN: Function = Function::unary("atan", 2, |x| Number::Flt(x.f64_or_nan().atan()));
+pub const ACOSH: Function = Function::unary("acosh", 2, |x| Number::Flt(x.f64_or_nan().acosh()));
+pub const ASINH: Function = Function::unary("asinh", 2, |x| Number::Flt(x.f64_or_nan().asinh()));
+pub const ATANH: Function = Function::unary("atanh", 2, |x| Number::Flt(x.f64_or_nan().atanh()));
+pub const EXP: Function = Function::unary("exp", 2, |x| Number::Flt(x.f64_or_nan().exp()));
+pub const LN: Function = Function::unary("ln", 2, |x| Number::Flt(x.f64_or_nan().ln()));
+pub const LOG: Function = Function::unary("log", 2, |x| Number::Flt(x.f64_or_nan().log10()));
 pub const NEG: Function = Function::unary("-", 6, |x| x.neg());
 pub const ID: Function = Function::unary("+", 6, |x| x);
 pub const ADD: Function = Function::binary("+", 4, |x, y| y + x);

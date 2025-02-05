@@ -1,6 +1,6 @@
 use crate::number::Number;
 
-#[derive(PartialEq, Debug, Copy, Clone)]
+#[derive(PartialEq, Debug, Clone)]
 pub enum TokenType {
     Literal(Number),
     Identifier,
@@ -17,7 +17,7 @@ pub enum TokenType {
     Eof,
 }
 
-#[derive(PartialEq, Debug, Copy, Clone)]
+#[derive(PartialEq, Debug, Clone)]
 pub struct Token<'t> {
     pub ttype: TokenType,
     pub lexeme: &'t str,

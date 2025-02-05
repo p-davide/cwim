@@ -72,12 +72,12 @@ mod test {
         let expected = S::Fun(
             MUL,
             vec![
-                S::Var(Number::Int(2)),
+                S::Var(Number::from(2)),
                 S::Fun(
                     ADD,
                     vec![
-                        S::Fun(ID, vec![S::Var(Number::Int(3))]),
-                        S::Var(Number::Int(5)),
+                        S::Fun(ID, vec![S::Var(Number::from(3))]),
+                        S::Var(Number::from(5)),
                     ],
                 ),
             ],

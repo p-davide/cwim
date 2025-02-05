@@ -41,7 +41,7 @@ fn unary<'f>(symbol: &'static str, f: Function<'f>) -> (String, Variable<'f>) {
     (symbol.to_owned(), Variable::Function(Functions::unary(f)))
 }
 
-fn value(symbol: &'static str, n: Number) -> (String, Variable) {
+fn value(symbol: &'static str, n: Number) -> (String, Variable<'static>) {
     (symbol.to_owned(), Variable::Value(n))
 }
 
