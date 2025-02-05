@@ -148,7 +148,10 @@ fn number<'a>(text: &'a str, column: &mut usize) -> Parsed<Token<'a>> {
         h += 2;
         radix = 2;
     }
-    for c in text.chars().skip(h) {
+    for c in text[h..].chars() {
+        // Using c.is_digit(radix) can parse one valid digit as 2 valid ones
+        // e.g. 0b112 is parsed as 0b11 2, which then evals to 6, which is
+        // likely not what the user intended
         if ((radix <= 10 && c.is_ascii_digit()) || (radix == 16 && c.is_ascii_hexdigit()))
             || c == '.'
         {
@@ -212,6 +215,10 @@ mod test {
         let actual = stmt(input, &env::Env::prelude()).unwrap();
         let expected = Stmt::Expr(expected_tokens);
         assert_eq!(expected, actual);
+    }
+
+    fn _0b() {
+        assert!(stmt("0b112", &env::Env::prelude()).is_err());
     }
 
     #[test]
