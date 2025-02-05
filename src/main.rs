@@ -19,12 +19,12 @@ fn run_line(line: &str, env: &mut Env) {
 fn repl() -> Result<()> {
     let mut env = Env::prelude();
     let mut rl = DefaultEditor::new()?;
-    #[cfg(feature = "with-file-history")]
-    if rl.load_history("history.txt").is_err() {
+    let history = ".cwim_history";
+    if rl.load_history(history).is_err() {
         println!("No previous history.");
     }
     loop {
-        let readline = rl.readline(">> ");
+        let readline = rl.readline("cwim> ");
         match readline {
             Ok(line) => {
                 let _ = rl.add_history_entry(line.as_str());
@@ -43,7 +43,7 @@ fn repl() -> Result<()> {
             }
         }
     }
-    Ok(())
+    rl.save_history(history)
 }
 
 fn main() {
