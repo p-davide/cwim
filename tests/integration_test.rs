@@ -192,3 +192,8 @@ fn _divide_by_zero() {
     assert!(run("-1/0", &mut Env::prelude()).is_ok_and(|it|it.is_nan()));
     assert!(run("-1/-0", &mut Env::prelude()).is_ok_and(|it|it.is_nan()));
 }
+
+#[test]
+fn _fractional_exponents() {
+    _test_run_float("2^ -1/2", 0.7071067811865476);
+}

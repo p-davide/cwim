@@ -1,4 +1,3 @@
-use core::f64;
 use std::{fmt::Display, ops::*};
 
 use num::{
@@ -211,12 +210,11 @@ impl Pow<Number> for Number {
                     .powf(y.to_f64().unwrap_or(std::f64::NAN)),
             ),
             (Number::Int(x), Number::Int(y)) => {
-                if y >= BigInt::ZERO {
-                    let yy = y.to_u32().unwrap_or(0);
-                    Number::Int(x.pow(yy))
-                } else {
-                    Number::Int(BigInt::one().div(&(x.pow(y.to_u32().unwrap_or(0)))))
+                let mut it = Number::Int(x.pow(y.abs().to_biguint().unwrap()));
+                if y.is_negative() {
+                    it = Number::Flt(1.) / it;
                 }
+                it
             }
         }
     }
