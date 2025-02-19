@@ -125,6 +125,11 @@ fn _unary_ordering() {
 }
 
 #[test]
+fn _unary_and_binary() {
+    _test_run_float("cos pi + 1", 0.);
+}
+
+#[test]
 fn _double_unary() {
     _test_run_float("sin cos 2-2", (1 as f64).sin());
     _test_run_float("sin(cos 2-2)", (1 as f64).sin());
@@ -189,8 +194,8 @@ fn _bignum() {
 
 #[test]
 fn _divide_by_zero() {
-    assert!(run("-1/0", &mut Env::prelude()).is_ok_and(|it|it.is_nan()));
-    assert!(run("-1/-0", &mut Env::prelude()).is_ok_and(|it|it.is_nan()));
+    assert!(run("-1/0", &mut Env::prelude()).is_ok_and(|it| it.is_nan()));
+    assert!(run("-1/-0", &mut Env::prelude()).is_ok_and(|it| it.is_nan()));
 }
 
 #[test]
